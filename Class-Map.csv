@@ -1,0 +1,9 @@
+Class,ClassMap,Order
+U.S. stocks & stock funds,U.S. stocks,4
+International stocks & stock funds,Intl stocks,5
+U.S. bonds & bond funds,U.S. bonds,2
+International bonds & bond funds,Intl bonds,3
+Other bond funds,Other bonds,6
+Short term reserves,Cash,0
+Other asset types,Other asset types,7
+Fixed,Fixed,1
