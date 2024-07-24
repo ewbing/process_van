@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 setup(
     name='VanAlloc',
     version='1.1',
-    description='Process Vanguard reports into consistent rows and add classifactions',
+    description='Process Vanguard reports into consistent rows and add classifications',
     author='Eric Bing',
     author_email='ericbing+github@gmail.com',
     url='https://github.com/ewbing/ProcessVan',

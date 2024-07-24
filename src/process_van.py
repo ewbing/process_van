@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """ Process Vanguard reports into consistent rows and add classifications.
 copyright (c) 2024, Eric Bing
 All rights reserved."""
@@ -8,8 +10,7 @@ import re
 import pandas as pd
 import numpy as np
 
-import constants as const
-#from .constants import DEFAULT_CSV_FILE, DEFAULT_HTML_FILE, DEFAULT_WORKING_DIRECTORY
+import constants
 
 def main():
     """
@@ -45,13 +46,13 @@ def main():
         "csv_path",
         nargs="?",
         help="input file from Vanguard assets (csv)",
-        default=f"data/{const.DEFAULT_CSV_FILE}",
+        default=f"data/{constants.DEFAULT_CSV_FILE}",
     )
     group.add_argument(
         "html_path",
         nargs="?",
         help="input file from Vanguard assets (html)",
-        default=f"data/{const.DEFAULT_HTML_FILE}",
+        default=f"data/{constants.DEFAULT_HTML_FILE}",
     )
     parser.add_argument(
         "-am", "--asset_map", help="mapping file for assets", default="Asset-Map.csv"
@@ -274,14 +275,14 @@ def read_html_portfolio(file_path: str) -> pd.DataFrame:
                     f"Expected {expected_columns} columns."
                 )
             return asset_table
-    except FileNotFoundError as e:
-        raise FileNotFoundError(f"The HTML file '{file_path}' was not found.") from e
+    except FileNotFoundError as fnfe:
+        raise FileNotFoundError(f"The HTML file '{file_path}' was not found.") from fnfe
 
 
 def csv_post_process(vadf) -> pd.DataFrame:
     """
-    Performs post-processing on the DataFrame `vadf` by inserting a 'Class' column based on 
-    the 'Value' column.  If 'Name' is null, assigns 'Account' to 'Class', propagates 'Class' 
+    Performs post-processing on the DataFrame `vadf` by inserting a 'Class' column based on
+    the 'Value' column.  If 'Name' is null, assigns 'Account' to 'Class', propagates 'Class'
     down, and removes rows with NaN in 'Value'.  Returns the post-processed DataFrame.
 
     Parameters:
