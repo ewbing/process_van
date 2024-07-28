@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-import process_van
+from process_van import read_asset_map
 #from ..src import process_van
 #from process_van.src.process_van import read_asset_map
 
