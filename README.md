@@ -32,3 +32,10 @@ other arguments:
                         mapping file for classes
 ```
 
+## CI Status
+
+[![Pylint](https://github.com/arunkv/wordle/actions/workflows/pylint.yml/badge.svg)](https://github.com/arunkv/wordle/actions/workflows/pylint.yml)
+
+## License
+
+Apache License 2.0

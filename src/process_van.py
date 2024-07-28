@@ -17,7 +17,7 @@ def main():
     This program processes Vanguard allocation reports into consistent rows and adds
     classifications. Primary input is from the Vanguard portfolio watch detail page.
     The CSV export (default -PortfolioWatchData.csv) is preferred because of its stability.
-    However, the HTML saved page from the website page can be used as well .
+    However, the HTML saved page from the website page can be used as well.
 
     Args:
         None
@@ -26,7 +26,7 @@ def main():
         None
     """
     parser = argparse.ArgumentParser(
-        description="Process Vanguard reports into consistent rows and add classifactions"
+        description="Process Vanguard reports into consistent rows and add classifications"
     )
     parser.add_argument(
         "-q", "--quiet", help="quiet mode - no warnings or status", action="store_true"
@@ -124,11 +124,6 @@ def read_asset_map(asset_map_path: str, quiet: bool = False) -> pd.DataFrame:
     """
     try:
         asset_map_df = pd.read_csv(asset_map_path)[["Name", "Class", "%"]]
-        if len(asset_map_df.columns) != 3:
-            raise ValueError(
-                f"Assset map file at {asset_map_path} has incorrect columns - "
-                f"should have 'Name','Class','%'"
-            )
         if not quiet:
             print(f"Read Asset map from {asset_map_path}")
     except FileNotFoundError:

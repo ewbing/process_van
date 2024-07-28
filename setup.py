@@ -11,6 +11,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'pandas',
+        'pytest',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
