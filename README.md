@@ -34,7 +34,7 @@ other arguments:
 
 ## CI Status
 
-[![Pylint](https://github.com/arunkv/wordle/actions/workflows/pylint.yml/badge.svg)](https://github.com/arunkv/wordle/actions/workflows/pylint.yml)
+[![Pylint](https://github.com/arunkv/wordle/actions/workflows/pylint.yml/badge.svg)](https://github.com/arunkv/wordle/actions/workflows/pylint.yml) [![Pytest](https://github.com/ewbing/process_van/actions/workflows/pytest.yml/badge.svg)](https://github.com/ewbing/process_van/actions/workflows/pytest.yml)
 
 ## License
 
