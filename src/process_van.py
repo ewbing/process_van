@@ -226,8 +226,8 @@ def read_csv_portfolio(csv_path: str) -> pd.DataFrame:
         ValueError: If the CSV file has incorrect columns.
     """
     try:
-        columns_in = ["Account", "Name", "Symbol", "Value", "% of Portfolio"]
-        columns_out = ["Name", "Account", "Symbol", "Value", "% of Portfolio"]
+        columns_in = ["Account Name", "Fund Name", "Symbol", "Value", "% of Portfolio"]
+        columns_out = ["Fund Name", "Account Name", "Symbol", "Value", "% of Portfolio"]
         # Read the CSV file using the specified columns
         with open(csv_path, "r", encoding="utf-8") as file:
             portfolio_data = pd.read_csv(file, usecols=columns_in)[columns_out]
@@ -288,12 +288,16 @@ def csv_post_process(vadf) -> pd.DataFrame:
     """
     vadf.insert(0, "Class", np.where(vadf.Value == "Value", "Class", None))
 
+    # Rename Account Name to Account and Fund Name to Name for consistency
+    vadf.rename(columns={"Account Name": "Account", "Fund Name": "Name"}, inplace=True)
+
     # vadf.loc[vadf.Account.isnull(),'Class']=vadf.Name
-    # Assign the value in Accoutn over to the Class column if the Name is null
-    vadf.loc[vadf.Name.isnull(), "Class"] = vadf.Account
+    # Assign the value in Account over to the Class column if the Name is null
+    vadf.loc[vadf.Name.isnull(), "Class"] = vadf["Account"]
 
     # Propagate Class down
-    vadf["Class"].ffill(inplace=True)
+    # Avoid inplace on a Series to prevent chained-assignment FutureWarning
+    vadf["Class"] = vadf["Class"].ffill()
 
     # Remove rows that have the Account (NaN in 'Value') - these have been propagated down
     # Need to reset index after rows are removed
@@ -321,7 +325,8 @@ def html_post_process(vadf, cmdf):
     vadf["Account"] = np.where(vadf.Value == "Value", "Account", vadf["Account"])
 
     # Propagate account down
-    vadf["Account"].ffill(inplace=True)
+    # Avoid inplace on a Series to prevent chained-assignment FutureWarning
+    vadf["Account"] = vadf["Account"].ffill()
     # Null out Subtotals & Totals
     vadf.loc[
         vadf[(vadf.Name == "Subtotal:") | (vadf.Name == "Total:")].index, "Account"
@@ -337,20 +342,20 @@ def html_post_process(vadf, cmdf):
 
     # Add ClassMap values to row after header rows - start with 0 because no explicit header:
     cmdfi = 0
-    vadf["Class"][0] = cmdf["ClassMap"][cmdfi]
-
+    vadf.at[0, "Class"] = cmdf["ClassMap"].iloc[cmdfi] 
     # For each header row add next Asset Classification value to the next row - use the ClassMap
     # column for the Class:
     for i in vadf[vadf["Class"] == "Class"].index:
         cmdfi += 1
-        vadf["Class"][i + 1] = cmdf["ClassMap"][cmdfi]
+        vadf.at[i + 1, "Class"] = cmdf["ClassMap"].iloc[cmdfi]
 
     if cmdfi != len(cmdf["ClassMap"]) - 1:
         print("Warning: Rowcount mismatch in ClassMap: cmdfi - ", cmdfi)
         print(cmdf["ClassMap"])
 
     # Propagate Class down
-    vadf["Class"].ffill(inplace=True)
+    # Avoid inplace on a Series to prevent chained-assignment FutureWarning
+    vadf["Class"] = vadf["Class"].ffill()
     return vadf
 
 
@@ -389,18 +394,17 @@ def post_process(vadf, cmdf, amdf, fixed, quiet=False):
     if fixed:
         if not quiet:
             print("Fixed mode")
-
         # should never have NaN in the Name column, but if we do...
-        vadf["Name"].fillna(value="None", inplace=True)
+        # Avoid inplace on a Series to prevent chained-assignment FutureWarning
+        vadf["Name"] = vadf["Name"].fillna("None")
 
         # Use this expression to check for fixed income assets
-        fixed_regex = re.compile(r"(individual|UST)")
+        fixed_regex = re.compile(r"(UNITED STATES TREAS|CPN|NTS)")
         # remap fixed securities to 'Fixed'
-        if fixed:
-            vadf["Class"] = vadf.apply(
-                lambda row: "Fixed" if fixed_regex.search(row.Name) else row.Class,
-                axis=1,
-            )
+        vadf["Class"] = vadf.apply(
+            lambda row: "Fixed" if fixed_regex.search(row.Name) else row.Class,
+            axis=1,
+        )
 
     # remap any Classes to classes specified in cmdf
     vadf.loc[vadf["Class"].isin(cmdf.Class), "Class"] = vadf["Class"].map(
