@@ -68,16 +68,20 @@ def main():
     if not args.quiet:
         print("Process Vanguard Allocations - v1.1 by Eric Bing")
 
+    html_dfs = pd.DataFrame()
+    vadf = pd.DataFrame()
+
     # Bring in (required) input file - via html_path or csv_path depending on mode
-    if args.mode == "html":
-        if not args.quiet:
-            print("HTML mode")
-        html_dfs = read_html_portfolio(args.html_path)
-    elif args.mode == "csv":
+    if args.mode == "csv":
         if not args.quiet:
             print("CSV mode")
         vadf = read_csv_portfolio(args.csv_path)
-        html_dfs = pd.DataFrame()
+    elif args.mode == "html":
+        print("HTML mode currently disabled due to changes to Vanguard website  - use CSV mode")
+        if not args.quiet:
+            print("HTML mode")
+        html_dfs = read_html_portfolio(args.html_path)
+        sys.exit(1)
 
     # Bring in (semi-optional) Class Map - provides / overrides mapping for specific classes
     cmdf = read_class_map(args.class_map, args.quiet)
@@ -91,10 +95,8 @@ def main():
         vadf = html_post_process(vadf, cmdf)
 
     # CSV post processing
-    elif args.mode == "csv":
-        # Class column
-        # Why None rather than np.nan?  Because it works...
-        vadf = csv_post_process(vadf)
+#    elif args.mode == "csv":
+#        vadf = csv_post_process(vadf)
     else:
         raise ValueError("Can't get thar from here...invalid value for mode")
 
@@ -229,7 +231,7 @@ def read_csv_portfolio(csv_path: str) -> pd.DataFrame:
         columns_in = ["Account Name", "Fund Name", "Symbol", "Value", "% of Portfolio"]
         columns_out = ["Fund Name", "Account Name", "Symbol", "Value", "% of Portfolio"]
         # Read the CSV file using the specified columns
-        with open(csv_path, "r", encoding="utf-8") as file:
+        with open(csv_path, "r", encoding="utf-8-sig") as file:
             portfolio_data = pd.read_csv(file, usecols=columns_in)[columns_out]
             if len(portfolio_data.columns) != 5:
                 # Raise a ValueError if the CSV file has incorrect columns
@@ -286,7 +288,8 @@ def csv_post_process(vadf) -> pd.DataFrame:
     Returns:
     pandas.DataFrame: The post-processed DataFrame with 'Class' column added and NaN values handled.
     """
-    vadf.insert(0, "Class", np.where(vadf.Value == "Value", "Class", None))
+    #vadf.insert(0, "Class", np.where(vadf.Value == "Value", "Class", None))
+    vadf.insert(0, "Class", vadf.Value.where(vadf.Value == "Value", None))
 
     # Rename Account Name to Account and Fund Name to Name for consistency
     vadf.rename(columns={"Account Name": "Account", "Fund Name": "Name"}, inplace=True)
@@ -338,11 +341,11 @@ def html_post_process(vadf, cmdf):
 
     # Class
     # Why None rather than np.nan?  Because it works...
-    vadf.insert(0, "Class", np.where(vadf.Value == "Value", "Class", None))
+    vadf.insert(0, "Class", vadf.Value.where(vadf.Value == "Value", "Class", None))
 
     # Add ClassMap values to row after header rows - start with 0 because no explicit header:
     cmdfi = 0
-    vadf.at[0, "Class"] = cmdf["ClassMap"].iloc[cmdfi] 
+    vadf.at[0, "Class"] = cmdf["ClassMap"].iloc[cmdfi]
     # For each header row add next Asset Classification value to the next row - use the ClassMap
     # column for the Class:
     for i in vadf[vadf["Class"] == "Class"].index:
@@ -446,12 +449,13 @@ def write_results(vadf, cmdf, quiet=False):
         if not quiet:
             print("Ouputing 'Other' Assets as 'Asset-Map-Candidates.csv'")
         odf["%"] = 1.0
-        odf.to_csv("Asset-Map-Candidates.csv", index=False)
+        # Using utf-8-sig to include BOM for Excel compatibility on Windows
+        odf.to_csv("Asset-Map-Candidates.csv", index=False, encoding="utf-8-sig")
 
     # Output the Allocations with headers and totals for pretty report
     if not quiet:
         print("Outputing allocations as csv report: out/Van-Alloc-Rep.csv")
-    vadf.to_csv("out/Van-Alloc-Rep.csv", index=False)
+    vadf.to_csv("out/Van-Alloc-Rep.csv", index=False, encoding="utf-8-sig")
 
     # Remove rows with Headers, Subtotals & Totals
     vadf.drop(
@@ -476,8 +480,7 @@ def write_results(vadf, cmdf, quiet=False):
     # Output the ordered Allocations
     if not quiet:
         print("Outputing sorted allocations without totals as csv: out/Van-Alloc.csv")
-    vadf.to_csv("out/Van-Alloc.csv", index=False)
-
+    vadf.to_csv("out/Van-Alloc.csv", index=False, encoding="utf-8-sig")
 
 def write_us_market(html_dfs, quiet):
     """
@@ -525,7 +528,7 @@ def write_us_market(html_dfs, quiet):
     # Output the Asset Market share
     if not quiet:
         print("Outputing US Stock Market shares as csv report: Van-Market.csv")
-    stockdf.to_csv("Van-Market.csv", index=False)
+    stockdf.to_csv("Van-Market.csv", index=False, encoding="utf-8-sig")
 
 
 if __name__ == "__main__":
