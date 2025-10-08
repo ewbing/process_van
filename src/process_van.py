@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-""" Process Vanguard reports into consistent rows and add classifications.
+"""Process Vanguard reports into consistent rows and add classifications.
 copyright (c) 2024, Eric Bing
 All rights reserved."""
 
 import sys
+import os
+from datetime import datetime
 import argparse
 import re
 import pandas as pd
 import numpy as np
 
 import constants
+
 
 def main():
     """
@@ -60,6 +63,20 @@ def main():
     parser.add_argument(
         "-cm", "--class_map", help="mapping file for classes", default="Class-Map.csv"
     )
+    parser.add_argument(
+        "--no-date",
+        dest="date_suffix",
+        action="store_false",
+        default=True,
+        help="Do NOT append an ISO date (-YYYY-MM-DD) to output filenames (default: append date)",
+    )
+    parser.add_argument(
+        "--date-format",
+        dest="date_format",
+        default="%Y-%m-%d",
+        help="strftime format for the date suffix (default: %%Y-%%m-%%d). "
+             "Do not include a leading '-' (it's added automatically).",
+    )
     args = parser.parse_args()
 
     if not args.quiet:
@@ -77,7 +94,9 @@ def main():
             print("CSV mode")
         vadf = read_csv_portfolio(args.csv_path)
     elif args.mode == "html":
-        print("HTML mode currently disabled due to changes to Vanguard website  - use CSV mode")
+        print(
+            "HTML mode currently disabled due to changes to Vanguard website  - use CSV mode"
+        )
         if not args.quiet:
             print("HTML mode")
         html_dfs = read_html_portfolio(args.html_path)
@@ -95,20 +114,20 @@ def main():
         vadf = html_post_process(vadf, cmdf)
 
     # CSV post processing
-#    elif args.mode == "csv":
-#        vadf = csv_post_process(vadf)
+    elif args.mode == "csv":
+        vadf = csv_post_process(vadf)
     else:
         raise ValueError("Can't get thar from here...invalid value for mode")
 
     # Common post processing
     post_process(vadf, cmdf, amdf, args.fixed, args.quiet)
 
-    # Write results out
-    write_results(vadf, cmdf, args.quiet)
+    # Write results out (pass date-suffix preference and format)
+    write_results(vadf, cmdf, args.quiet, args.date_suffix, args.date_format)
 
     # Output U.S. Stock Market share (HTML only)
     if args.mode == "html":
-        write_us_market(html_dfs, args.quiet)
+        write_us_market(html_dfs, args.quiet, args.date_suffix, args.date_format)
 
 
 def read_asset_map(asset_map_path: str, quiet: bool = False) -> pd.DataFrame:
@@ -288,7 +307,7 @@ def csv_post_process(vadf) -> pd.DataFrame:
     Returns:
     pandas.DataFrame: The post-processed DataFrame with 'Class' column added and NaN values handled.
     """
-    #vadf.insert(0, "Class", np.where(vadf.Value == "Value", "Class", None))
+    # vadf.insert(0, "Class", np.where(vadf.Value == "Value", "Class", None))
     vadf.insert(0, "Class", vadf.Value.where(vadf.Value == "Value", None))
 
     # Rename Account Name to Account and Fund Name to Name for consistency
@@ -420,7 +439,9 @@ def post_process(vadf, cmdf, amdf, fixed, quiet=False):
     )
 
 
-def write_results(vadf, cmdf, quiet=False):
+def write_results(
+    vadf, cmdf, quiet=False, date_on: bool = True, date_format: str = "%Y-%m-%d"
+):
     """
     Writes the results of the asset allocation to various files.
 
@@ -441,21 +462,33 @@ def write_results(vadf, cmdf, quiet=False):
         4) US Asset Market Share (HTML input only)
     """
 
+    # Build an ISO date suffix for output files when enabled: -YYYY-MM-DD
+    if date_on:
+        now = datetime.now()
+        # date_format is an strftime fragment, add leading '-' automatically
+        date_suffix = f"-{now.strftime(date_format)}"
+    else:
+        date_suffix = ""
+
     # Any Class still starting with 'Other' are candidates for mapping - output the candidates
     odf = vadf.dropna(subset=["Class"])[vadf.Class.str.startswith("Other").dropna()][
         ["Name", "Class"]
     ].reset_index(drop=True)
     if len(odf) > 0:
-        if not quiet:
-            print("Ouputing 'Other' Assets as 'Asset-Map-Candidates.csv'")
         odf["%"] = 1.0
         # Using utf-8-sig to include BOM for Excel compatibility on Windows
-        odf.to_csv("Asset-Map-Candidates.csv", index=False, encoding="utf-8-sig")
+        odf_name = f"Asset-Map-Candidates{date_suffix}.csv"
+        if not quiet:
+            print(f"Outputting 'Other' Assets as '{odf_name}'")
+        odf.to_csv(odf_name, index=False, encoding="utf-8-sig")
 
     # Output the Allocations with headers and totals for pretty report
+    # Ensure output dir exists
+    os.makedirs("out", exist_ok=True)
+    rep_name = f"out/Van-Alloc-Rep{date_suffix}.csv"
     if not quiet:
-        print("Outputing allocations as csv report: out/Van-Alloc-Rep.csv")
-    vadf.to_csv("out/Van-Alloc-Rep.csv", index=False, encoding="utf-8-sig")
+        print(f"Outputting allocations as csv report: {rep_name}")
+    vadf.to_csv(rep_name, index=False, encoding="utf-8-sig")
 
     # Remove rows with Headers, Subtotals & Totals
     vadf.drop(
@@ -478,11 +511,15 @@ def write_results(vadf, cmdf, quiet=False):
         vadf = vadf.sort_values(by=["Class"], kind="mergesort")
 
     # Output the ordered Allocations
+    alloc_name = f"out/Van-Alloc{date_suffix}.csv"
     if not quiet:
-        print("Outputing sorted allocations without totals as csv: out/Van-Alloc.csv")
-    vadf.to_csv("out/Van-Alloc.csv", index=False, encoding="utf-8-sig")
+        print(f"Outputting sorted allocations without totals as csv: {alloc_name}")
+    vadf.to_csv(alloc_name, index=False, encoding="utf-8-sig")
 
-def write_us_market(html_dfs, quiet):
+
+def write_us_market(
+    html_dfs, quiet, date_on: bool = True, date_format: str = "%Y-%m-%d"
+):
     """
     Writes the US stock market share data to a CSV file.  Only in HTML mode.
 
@@ -526,9 +563,15 @@ def write_us_market(html_dfs, quiet):
     )
 
     # Output the Asset Market share
+    if date_on:
+        now = datetime.now()
+        date_suffix = f"-{now.strftime(date_format)}"
+    else:
+        date_suffix = ""
+    market_name = f"Van-Market{date_suffix}.csv"
     if not quiet:
-        print("Outputing US Stock Market shares as csv report: Van-Market.csv")
-    stockdf.to_csv("Van-Market.csv", index=False, encoding="utf-8-sig")
+        print(f"Outputting US Stock Market shares as csv report: {market_name}")
+    stockdf.to_csv(market_name, index=False, encoding="utf-8-sig")
 
 
 if __name__ == "__main__":
