@@ -11,5 +11,4 @@ Licensed under the Apache License, Version 2.0
 """
 
 DEFAULT_CSV_FILE = "PortfolioWatchData.csv"
-DEFAULT_HTML_FILE = "Vanguard - Portfolio Analysis.html"
 DEFAULT_WORKING_DIRECTORY = "hogwarts_test"
