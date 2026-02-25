@@ -1,7 +1,7 @@
 ﻿# process_van
 
-This program processes Vanguard allocation reports into consistent rows and adds classifications. 
-Primary input is from the Vanguard portfolio watch detail page.  The CSV export 
+This program processes Vanguard allocation reports into consistent rows and adds classifications.
+Primary input is from the Vanguard portfolio watch detail page.  The CSV export
 is preferred because of its stability.
 
 ## Installation
@@ -19,9 +19,9 @@ is preferred because of its stability.
 
 > `process_van.py [-h] [-q] [-f] [-am ASSET_MAP] [-cm CLASS_MAP] [csv_path]`
 
-
 ## Options
-```
+
+```text
 positional arguments:
   csv_path              input export csv file from Vanguard assets (default data/PortfolioWatchData.csv) 
 
