@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Process Vanguard reports into consistent rows and add classifications.
-copyright (c) 2024, Eric Bing
+copyright (c) 2026, Eric Bing
 All rights reserved."""
 
 import sys
