@@ -177,7 +177,10 @@ cython_debug/
 */.DS_Store
 .DS_Store
 
-# Project specific
+# Project specific - avoid checking in any data
 /realdata
+/out
+/data
 PortfolioWatchData*
 Van-Alloc*
+Asset*
