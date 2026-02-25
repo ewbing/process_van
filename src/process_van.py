@@ -20,7 +20,6 @@ def main():
     This program processes Vanguard allocation reports into consistent rows and adds
     classifications. Primary input is from the Vanguard portfolio watch detail page.
     The CSV export (default -PortfolioWatchData.csv) is preferred because of its stability.
-    However, the HTML saved page from the website page can be used as well.
 
     Args:
         None
@@ -38,24 +37,10 @@ def main():
         "-f", "--fixed", help="Group CDs and Treasuries in Fixed", action="store_true"
     )
     parser.add_argument(
-        "-m",
-        "--mode",
-        help="type of input file",
-        choices=["html", "csv"],
-        default="csv",
-    )
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
         "csv_path",
         nargs="?",
         help="input file from Vanguard assets (csv)",
         default=f"data/{constants.DEFAULT_CSV_FILE}",
-    )
-    group.add_argument(
-        "html_path",
-        nargs="?",
-        help="input file from Vanguard assets (html)",
-        default=f"data/{constants.DEFAULT_HTML_FILE}",
     )
     parser.add_argument(
         "-am", "--asset_map", help="mapping file for assets", default="Asset-Map.csv"
@@ -85,22 +70,11 @@ def main():
     if not args.quiet:
         print("Process Vanguard Allocations - v1.1 by Eric Bing")
 
-    html_dfs = pd.DataFrame()
-    vadf = pd.DataFrame()
+    if not args.quiet:
+        print("CSV mode")
 
-    # Bring in (required) input file - via html_path or csv_path depending on mode
-    if args.mode == "csv":
-        if not args.quiet:
-            print("CSV mode")
-        vadf = read_csv_portfolio(args.csv_path)
-    elif args.mode == "html":
-        print(
-            "HTML mode currently disabled due to changes to Vanguard website  - use CSV mode"
-        )
-        if not args.quiet:
-            print("HTML mode")
-        html_dfs = read_html_portfolio(args.html_path)
-        sys.exit(1)
+    # Bring in (required) input file
+    vadf = read_csv_portfolio(args.csv_path)
 
     # Bring in (semi-optional) Class Map - provides / overrides mapping for specific classes
     cmdf = read_class_map(args.class_map, args.quiet)
@@ -109,26 +83,14 @@ def main():
     # A new candidate file will be output later on as Asset-Map-Candidates.csv
     amdf = read_asset_map(args.asset_map, args.quiet)
 
-    # HTML post processing
-    if args.mode == "html":
-        vadf = html_post_process(vadf, cmdf)
-
     # CSV post processing
-    elif args.mode == "csv":
-        vadf = csv_post_process(vadf)
-    else:
-        raise ValueError("Can't get thar from here...invalid value for mode")
+    vadf = csv_post_process(vadf)
 
     # Common post processing
     post_process(vadf, cmdf, amdf, args.fixed, args.quiet)
 
     # Write results out (pass date-suffix preference and format)
     write_results(vadf, cmdf, args.quiet, args.date_suffix, args.date_format)
-
-    # Output U.S. Stock Market share (HTML only)
-    if args.mode == "html":
-        write_us_market(html_dfs, args.quiet, args.date_suffix, args.date_format)
-
 
 def read_asset_map(asset_map_path: str, quiet: bool = False) -> pd.DataFrame:
     """
@@ -161,7 +123,7 @@ def read_class_map(class_map_path: str, quiet: bool = False) -> pd.DataFrame:
     Read a class map from a given path and return it as a pandas DataFrame.
 
     Bring in (semi-optional) Class Map - provides / overrides mapping for specific classes.
-    Provides the ordering that the Asset Classifications come in (for HTML table).
+    Provides the ordering that the Asset Classifications come in (for reports).
     Also provides the mapping to new classifications (ClassMap column) where they can be mapped
     at a classification level as well as the target ordering of Asset Classifications.
 
@@ -186,7 +148,7 @@ def read_class_map(class_map_path: str, quiet: bool = False) -> pd.DataFrame:
     except FileNotFoundError:
         print(
             f"Class Map not found at {class_map_path} - falling over to hardcoded Asset Classes"
-            f"for HTML mapping."
+            f" for CSV mapping."
         )
         class_map = pd.DataFrame(
             {
@@ -266,35 +228,6 @@ def read_csv_portfolio(csv_path: str) -> pd.DataFrame:
         ) from None
 
 
-def read_html_portfolio(file_path: str) -> pd.DataFrame:
-    """
-    Reads the HTML file and extracts the table with the asset information.
-
-    Args:
-        file_path (str): The path to the HTML file.
-
-    Returns:
-        pandas.DataFrame: The DataFrame containing the asset information.
-
-    Raises:
-        FileNotFoundError: If the HTML file is not found.
-        ValueError: If the table has an incorrect number of columns.
-    """
-    try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            tables = pd.read_html(file.read())
-            asset_table = tables[3]
-            expected_columns = 3
-            if len(asset_table.columns) != expected_columns:
-                raise ValueError(
-                    "The HTML output has an incorrect number of columns for assets. "
-                    f"Expected {expected_columns} columns."
-                )
-            return asset_table
-    except FileNotFoundError as fnfe:
-        raise FileNotFoundError(f"The HTML file '{file_path}' was not found.") from fnfe
-
-
 def csv_post_process(vadf) -> pd.DataFrame:
     """
     Performs post-processing on the DataFrame `vadf` by inserting a 'Class' column based on
@@ -324,60 +257,6 @@ def csv_post_process(vadf) -> pd.DataFrame:
     # Remove rows that have the Account (NaN in 'Value') - these have been propagated down
     # Need to reset index after rows are removed
     vadf = vadf.dropna(subset=["Value"]).reset_index(drop=True)
-    return vadf
-
-
-def html_post_process(vadf, cmdf):
-    """
-    Post-processes the given DataFrame `vadf` by adding the 'Account' and 'Class' columns
-    based on the values in the 'Value' column.
-
-    Parameters:
-        vadf (pandas.DataFrame): The DataFrame to be post-processed.
-        cmdf (pandas.DataFrame): The DataFrame containing the 'ClassMap' column used for
-        assigning values to the 'Class' column.
-
-    Returns:
-        pandas.DataFrame: The post-processed DataFrame with the 'Account' and 'Class' columns added.
-    """
-    # Account
-    # Create with where...but nested where clauses don't work -
-    # nan throws them off so need two lines :-(
-    vadf.insert(1, "Account", np.where(vadf.Value.isnull(), vadf.Name, np.nan))
-    vadf["Account"] = np.where(vadf.Value == "Value", "Account", vadf["Account"])
-
-    # Propagate account down
-    # Avoid inplace on a Series to prevent chained-assignment FutureWarning
-    vadf["Account"] = vadf["Account"].ffill()
-    # Null out Subtotals & Totals
-    vadf.loc[
-        vadf[(vadf.Name == "Subtotal:") | (vadf.Name == "Total:")].index, "Account"
-    ] = np.nan
-
-    # Remove rows that have the Account (NaN in 'Value') - these have been propagated down
-    # Need to reset index after rows are removed
-    vadf = vadf.dropna(subset=["Value"]).reset_index(drop=True)
-
-    # Class
-    # Why None rather than np.nan?  Because it works...
-    vadf.insert(0, "Class", vadf.Value.where(vadf.Value == "Value", "Class", None))
-
-    # Add ClassMap values to row after header rows - start with 0 because no explicit header:
-    cmdfi = 0
-    vadf.at[0, "Class"] = cmdf["ClassMap"].iloc[cmdfi]
-    # For each header row add next Asset Classification value to the next row - use the ClassMap
-    # column for the Class:
-    for i in vadf[vadf["Class"] == "Class"].index:
-        cmdfi += 1
-        vadf.at[i + 1, "Class"] = cmdf["ClassMap"].iloc[cmdfi]
-
-    if cmdfi != len(cmdf["ClassMap"]) - 1:
-        print("Warning: Rowcount mismatch in ClassMap: cmdfi - ", cmdfi)
-        print(cmdf["ClassMap"])
-
-    # Propagate Class down
-    # Avoid inplace on a Series to prevent chained-assignment FutureWarning
-    vadf["Class"] = vadf["Class"].ffill()
     return vadf
 
 
@@ -448,7 +327,6 @@ def write_results(
     Parameters:
         vadf (DataFrame): The DataFrame containing the asset allocation data.
         cmdf (DataFrame): The DataFrame containing the command file data.
-        html_dfs (list of DataFrames): The list of DataFrames containing the HTML output.
         quiet (bool, optional): If True, suppresses the output messages. Defaults to False.
 
     Returns:
@@ -459,7 +337,7 @@ def write_results(
         1) unclassified assets (candidate for mapping next time the program is run)
         2) unordered report with subtotals and totals maintained
         3) ordered report with consistent rows (for spreadsheet processing)
-        4) US Asset Market Share (HTML input only)
+        4) report outputs for downstream spreadsheet processing
     """
 
     # Build an ISO date suffix for output files when enabled: -YYYY-MM-DD
@@ -515,63 +393,6 @@ def write_results(
     if not quiet:
         print(f"Outputting sorted allocations without totals as csv: {alloc_name}")
     vadf.to_csv(alloc_name, index=False, encoding="utf-8-sig")
-
-
-def write_us_market(
-    html_dfs, quiet, date_on: bool = True, date_format: str = "%Y-%m-%d"
-):
-    """
-    Writes the US stock market share data to a CSV file.  Only in HTML mode.
-
-    Args:
-        html_dfs (list): A list of pandas DataFrames representing the HTML tables.
-        quiet (bool): If True, suppresses the output message.
-
-    Returns:
-        None
-
-    Raises:
-        SystemExit: If the HTML output table 4 has incorrect columns for the US market share.
-
-    Description:
-        This function extracts the US stock market share data from the 4th table in the `html_dfs`
-        list.  It checks if the DataFrame has the correct number of columns (4) and an exception
-        if it doesn't. The function then converts the "Your U.S. Stock Portfolio" column from
-        strings of the form '3.05%' to fractional percentages '.0305'.  Finally, it outputs the
-        US stock market share data to a CSV file named "Van-Market.csv" unless `quiet` is True.
-    """
-
-    stockdf = html_dfs[4][
-        [
-            "Size",
-            "Your U.S. Stock Portfolio",
-            "U.S. Stock Market",
-            "Difference from Market",
-        ]
-    ]
-    if len(stockdf.columns) != 4:
-        sys.exit(
-            "HTML output [table 4] has incorrect columns for U.S. market share - correct page?"
-        )
-
-        # Convert strings of the form '3.05%' to fractional percentages '.0305'
-        # - the way god intended them:
-    stockdf["Your U.S. Stock Portfolio"] = (
-        stockdf["Your U.S. Stock Portfolio"]
-        .str.replace("%", "")
-        .apply(lambda x: float(x) / 100)
-    )
-
-    # Output the Asset Market share
-    if date_on:
-        now = datetime.now()
-        date_suffix = f"-{now.strftime(date_format)}"
-    else:
-        date_suffix = ""
-    market_name = f"Van-Market{date_suffix}.csv"
-    if not quiet:
-        print(f"Outputting US Stock Market shares as csv report: {market_name}")
-    stockdf.to_csv(market_name, index=False, encoding="utf-8-sig")
 
 
 if __name__ == "__main__":
