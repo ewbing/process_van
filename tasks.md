@@ -16,9 +16,9 @@ Tracking list for remaining issues and refactors.
 
 ## CSV Schema Validation
 
-- [ ] Add a shared helper to validate required columns for portfolio/class-map/asset-map CSVs.
-- [ ] Raise user-friendly `ValueError` messages listing missing and extra columns.
-- [ ] Remove ineffective `len(columns)` checks after column subsetting.
+- [x] Add a shared helper to validate required columns for portfolio/class-map/asset-map CSVs.
+- [x] Raise user-friendly `ValueError` messages listing missing and extra columns.
+- [x] Remove ineffective `len(columns)` checks after column subsetting.
 
 ## Error Handling Consistency
 
@@ -47,7 +47,7 @@ Tracking list for remaining issues and refactors.
 - [x] Add CLI tests for `-h`, missing file, and invalid map schemas.
 - [x] Add tests for date suffix options: `--no-date` and `--date-format`.
 - [x] Add full test using a subset of Hogwarts-Van-Alloc.csv
-- [ ] Switch Hogwarts test to fixture?
+- [ ] Switch Hogwarts test to fixture?  Hold for now
 
 ## Packaging and Dependencies
 

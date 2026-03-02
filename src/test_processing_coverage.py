@@ -23,7 +23,6 @@ def test_read_csv_portfolio_reorders_columns(tmp_path):
             "Symbol": ["AAA"],
             "Value": [100.0],
             "% of Portfolio": ["10.00%"],
-            "Ignored": ["x"],
         }
     ).to_csv(csv_path, index=False)
 
@@ -52,6 +51,31 @@ def test_read_csv_portfolio_missing_required_columns_raises_value_error(tmp_path
 
     with pytest.raises(ValueError):
         read_csv_portfolio(str(csv_path))
+
+
+def test_read_csv_portfolio_extra_columns_warn_and_continue(tmp_path):
+    csv_path = tmp_path / "extra-portfolio.csv"
+    pd.DataFrame(
+        {
+            "Account Name": ["Acct A"],
+            "Fund Name": ["Fund A"],
+            "Symbol": ["AAA"],
+            "Value": [100.0],
+            "% of Portfolio": ["10.00%"],
+            "Extra": ["x"],
+        }
+    ).to_csv(csv_path, index=False)
+
+    with pytest.warns(UserWarning, match="extra columns that will be ignored"):
+        actual = read_csv_portfolio(str(csv_path))
+
+    assert actual.columns.tolist() == [
+        "Fund Name",
+        "Account Name",
+        "Symbol",
+        "Value",
+        "% of Portfolio",
+    ]
 
 
 def test_csv_post_process_normalizes_rows_and_drops_nan_values():

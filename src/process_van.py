@@ -9,10 +9,51 @@ import os
 from datetime import datetime
 import argparse
 import re
+import warnings
 import pandas as pd
 import numpy as np
 
 import constants
+
+
+def validate_csv_schema(
+    df: pd.DataFrame,
+    expected_columns: list[str],
+    *,
+    schema_name: str,
+    csv_path: str,
+) -> pd.DataFrame:
+    """
+    Validate CSV schema against an expected ordered column list.
+
+    Raises ValueError for missing required columns.
+    Warns for extra columns and returns a DataFrame subset in expected column order.
+    """
+    actual_columns = list(df.columns)
+    expected_set = set(expected_columns)
+    actual_set = set(actual_columns)
+    missing_columns = sorted(expected_set - actual_set)
+    extra_columns = sorted(actual_set - expected_set)
+
+    if missing_columns:
+        raise ValueError(
+            f"{schema_name} CSV at {csv_path} has invalid columns. "
+            f"Expected: {expected_columns}. "
+            f"Found: {actual_columns}. "
+            f"Missing: {missing_columns}."
+        )
+
+    if extra_columns:
+        warnings.warn(
+            (
+                f"{schema_name} CSV at {csv_path} has extra columns that will be ignored. "
+                f"Extra: {extra_columns}."
+            ),
+            UserWarning,
+            stacklevel=2,
+        )
+
+    return df[expected_columns]
 
 
 def resolve_working_directory_path(working_directory: str) -> str:
@@ -203,8 +244,14 @@ def read_asset_map(asset_map_path: str, quiet: bool = False) -> pd.DataFrame:
         pd.DataFrame: A DataFrame containing the asset map data
         with columns 'Name', 'Class', and '%'.
     """
+    expected_columns = ["Name", "Class", "%"]
     try:
-        asset_map_df = pd.read_csv(asset_map_path)[["Name", "Class", "%"]]
+        asset_map_df = validate_csv_schema(
+            pd.read_csv(asset_map_path),
+            expected_columns,
+            schema_name="Asset map",
+            csv_path=asset_map_path,
+        )
         if not quiet:
             print(f"Read Asset map from {asset_map_path}")
     except FileNotFoundError:
@@ -212,7 +259,7 @@ def read_asset_map(asset_map_path: str, quiet: bool = False) -> pd.DataFrame:
         print(
             f"Asset Map not found at {asset_map_path} - no additional asset mapping will be done"
         )
-        asset_map_df = pd.DataFrame(columns=["Name", "Class", "%"])
+        asset_map_df = pd.DataFrame(columns=expected_columns)
     return asset_map_df
 
 
@@ -233,13 +280,14 @@ def read_class_map(class_map_path: str, quiet: bool = False) -> pd.DataFrame:
         pd.DataFrame: A DataFrame containing the class map data with columns
         'Class', 'ClassMap', and 'Order'.
     """
+    expected_columns = ["Class", "ClassMap", "Order"]
     try:
-        class_map = pd.read_csv(class_map_path)[["Class", "ClassMap", "Order"]]
-        if len(class_map.columns) != 3:
-            raise ValueError(
-                f"Class map file at {class_map_path} has incorrect columns - "
-                f"should be 'Class','ClassMap','Order'"
-            )
+        class_map = validate_csv_schema(
+            pd.read_csv(class_map_path),
+            expected_columns,
+            schema_name="Class map",
+            csv_path=class_map_path,
+        )
 
         if not quiet:
             print(f"Read Class map from {class_map_path}")
@@ -306,19 +354,23 @@ def read_csv_portfolio(csv_path: str) -> pd.DataFrame:
         FileNotFoundError: If the CSV file is not found at the specified path.
         ValueError: If the CSV file has incorrect columns.
     """
+    columns_in = ["Account Name", "Fund Name", "Symbol", "Value", "% of Portfolio"]
+    columns_out = ["Fund Name", "Account Name", "Symbol", "Value", "% of Portfolio"]
+    if not set(columns_out).issubset(set(columns_in)):
+        raise RuntimeError(
+            "Internal column config mismatch: columns_out must be a subset of columns_in. "
+            f"columns_in={columns_in}, columns_out={columns_out}"
+        )
     try:
-        columns_in = ["Account Name", "Fund Name", "Symbol", "Value", "% of Portfolio"]
-        columns_out = ["Fund Name", "Account Name", "Symbol", "Value", "% of Portfolio"]
-        # Read the CSV file using the specified columns
+        # Read and validate schema before reordering output columns.
         with open(csv_path, "r", encoding="utf-8-sig") as file:
-            portfolio_data = pd.read_csv(file, usecols=columns_in)[columns_out]
-            if len(portfolio_data.columns) != 5:
-                # Raise a ValueError if the CSV file has incorrect columns
-                raise ValueError(
-                    f"CSV file at {csv_path} has incorrect columns - "
-                    f"should have {columns_in} columns."
-                )
-            return portfolio_data
+            portfolio_data = validate_csv_schema(
+                pd.read_csv(file),
+                columns_in,
+                schema_name="Portfolio",
+                csv_path=csv_path,
+            )
+            return portfolio_data[columns_out]
     except FileNotFoundError:
         # Raise a FileNotFoundError if the CSV file is not found at the specified path
         raise FileNotFoundError(

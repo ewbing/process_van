@@ -128,7 +128,7 @@ def test_cli_missing_input_file_raises_file_not_found(tmp_path):
             main()
 
 
-def test_cli_invalid_class_map_schema_raises_key_error(tmp_path, monkeypatch):
+def test_cli_invalid_class_map_schema_raises_value_error(tmp_path, monkeypatch):
     portfolio_path = tmp_path / "portfolio.csv"
     class_map_path = tmp_path / "bad-class-map.csv"
     monkeypatch.chdir(tmp_path)
@@ -148,11 +148,14 @@ def test_cli_invalid_class_map_schema_raises_key_error(tmp_path, monkeypatch):
             str(class_map_path),
         ],
     ):
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError) as exc_info:
             main()
+    message = str(exc_info.value)
+    assert "Class map CSV" in message
+    assert "Missing: ['Order']" in message
 
 
-def test_cli_invalid_asset_map_schema_raises_key_error(tmp_path, monkeypatch):
+def test_cli_invalid_asset_map_schema_raises_value_error(tmp_path, monkeypatch):
     portfolio_path = tmp_path / "portfolio.csv"
     class_map_path = tmp_path / "class-map.csv"
     asset_map_path = tmp_path / "bad-asset-map.csv"
@@ -176,8 +179,11 @@ def test_cli_invalid_asset_map_schema_raises_key_error(tmp_path, monkeypatch):
             str(asset_map_path),
         ],
     ):
-        with pytest.raises(KeyError):
+        with pytest.raises(ValueError) as exc_info:
             main()
+    message = str(exc_info.value)
+    assert "Asset map CSV" in message
+    assert "Missing: ['Name']" in message
 
 
 def test_cli_no_date_option_writes_non_suffixed_output_files(tmp_path, monkeypatch):

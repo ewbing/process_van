@@ -42,9 +42,10 @@ def test_read_asset_map_with_invalid_columns(asset_map_path):
         mock_read_csv.return_value = invalid_columns_df
 
         # Act & Assert
-        with pytest.raises(KeyError) as excinfo:
+        with pytest.raises(ValueError) as excinfo:
             read_asset_map(asset_map_path, quiet=True)
-        assert str(excinfo.value) == "\"['Name'] not in index\""
+        assert "Asset map CSV" in str(excinfo.value)
+        assert "Missing: ['Name']" in str(excinfo.value)
 
 
 def test_read_asset_map_with_file_not_found(asset_map_path):
