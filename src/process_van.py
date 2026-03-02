@@ -15,20 +15,45 @@ import numpy as np
 import constants
 
 
-def resolve_input_csv_path(csv_path: str | None, csv_path_positional: str | None) -> str:
+def resolve_working_directory_path(working_directory: str) -> str:
+    """
+    Resolve a working directory path by expanding '~' and normalizing to an absolute path.
+    """
+    return os.path.abspath(os.path.expanduser(working_directory))
+
+
+def resolve_path_with_working_directory(path_value: str, working_directory: str) -> str:
+    """
+    Resolve a user-provided path against working_directory when it is relative.
+    """
+    expanded = os.path.expanduser(path_value)
+    if os.path.isabs(expanded):
+        return os.path.abspath(expanded)
+    return os.path.abspath(os.path.join(working_directory, expanded))
+
+
+def resolve_input_csv_path(
+    csv_path: str | None,
+    csv_path_positional: str | None,
+    working_directory: str,
+) -> str:
     """
     Resolve the portfolio CSV input path from explicit and positional CLI arguments.
 
     Precedence:
         1) --csv-path
         2) positional fallback
-        3) default data/PortfolioWatchData.csv
+        3) default <working_directory>/downloads/PortfolioWatchData.csv
     """
     if csv_path:
-        return csv_path
+        return resolve_path_with_working_directory(csv_path, working_directory)
     if csv_path_positional:
-        return csv_path_positional
-    return f"data/{constants.DEFAULT_CSV_FILE}"
+        return resolve_path_with_working_directory(
+            csv_path_positional, working_directory
+        )
+    return os.path.join(
+        working_directory, constants.DEFAULT_DOWNLOADS_DIRECTORY, constants.DEFAULT_CSV_FILE
+    )
 
 
 def validate_input_csv_path(csv_path: str) -> None:
@@ -67,12 +92,22 @@ def main():
         "-f", "--fixed", help="Group CDs and Treasuries in Fixed", action="store_true"
     )
     parser.add_argument(
+        "-wd",
+        "--working-dir",
+        dest="working_dir",
+        default=constants.DEFAULT_WORKING_DIRECTORY,
+        help=(
+            "base working directory for defaults "
+            f"(default {constants.DEFAULT_WORKING_DIRECTORY})"
+        ),
+    )
+    parser.add_argument(
         "--csv-path",
         dest="csv_path",
         default=None,
         help=(
             "input export csv file from Vanguard assets "
-            f"(default data/{constants.DEFAULT_CSV_FILE})"
+            f"(default <working-dir>/{constants.DEFAULT_DOWNLOADS_DIRECTORY}/{constants.DEFAULT_CSV_FILE})"
         ),
     )
     parser.add_argument(
@@ -81,10 +116,16 @@ def main():
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
-        "-am", "--asset_map", help="mapping file for assets", default="Asset-Map.csv"
+        "-am",
+        "--asset_map",
+        help="mapping file for assets (default <working-dir>/Asset-Map.csv)",
+        default=None,
     )
     parser.add_argument(
-        "-cm", "--class_map", help="mapping file for classes", default="Class-Map.csv"
+        "-cm",
+        "--class_map",
+        help="mapping file for classes (default <working-dir>/Class-Map.csv)",
+        default=None,
     )
     parser.add_argument(
         "--no-date",
@@ -111,18 +152,27 @@ def main():
     if not args.quiet:
         print("CSV mode")
 
-    resolved_csv_path = resolve_input_csv_path(args.csv_path, args.csv_path_positional)
+    working_directory = resolve_working_directory_path(args.working_dir)
+    resolved_csv_path = resolve_input_csv_path(
+        args.csv_path, args.csv_path_positional, working_directory
+    )
+    resolved_class_map_path = resolve_path_with_working_directory(
+        args.class_map or constants.DEFAULT_CLASS_MAP_FILE, working_directory
+    )
+    resolved_asset_map_path = resolve_path_with_working_directory(
+        args.asset_map or constants.DEFAULT_ASSET_MAP_FILE, working_directory
+    )
     validate_input_csv_path(resolved_csv_path)
 
     # Bring in (required) input file
     vadf = read_csv_portfolio(resolved_csv_path)
 
     # Bring in (semi-optional) Class Map - provides / overrides mapping for specific classes
-    cmdf = read_class_map(args.class_map, args.quiet)
+    cmdf = read_class_map(resolved_class_map_path, args.quiet)
 
     # Bring in (optional) Asset Map - provides / overrides mapping for specific assets to classes
     # A new candidate file will be output later on as Asset-Map-Candidates.csv
-    amdf = read_asset_map(args.asset_map, args.quiet)
+    amdf = read_asset_map(resolved_asset_map_path, args.quiet)
 
     # CSV post processing
     vadf = csv_post_process(vadf)
@@ -131,7 +181,14 @@ def main():
     post_process(vadf, cmdf, amdf, args.fixed, args.quiet)
 
     # Write results out (pass date-suffix preference and format)
-    write_results(vadf, cmdf, args.quiet, args.date_suffix, args.date_format)
+    write_results(
+        vadf,
+        cmdf,
+        args.quiet,
+        args.date_suffix,
+        args.date_format,
+        working_directory,
+    )
 
 def read_asset_map(asset_map_path: str, quiet: bool = False) -> pd.DataFrame:
     """
@@ -363,7 +420,12 @@ def post_process(vadf, cmdf, amdf, fixed, quiet=False):
 
 
 def write_results(
-    vadf, cmdf, quiet=False, date_on: bool = True, date_format: str = "%Y-%m-%d"
+    vadf,
+    cmdf,
+    quiet=False,
+    date_on: bool = True,
+    date_format: str = "%Y-%m-%d",
+    working_directory: str = ".",
 ):
     """
     Writes the results of the asset allocation to various files.
@@ -384,6 +446,8 @@ def write_results(
         4) report outputs for downstream spreadsheet processing
     """
 
+    working_directory = resolve_working_directory_path(working_directory)
+
     # Build an ISO date suffix for output files when enabled: -YYYY-MM-DD
     if date_on:
         now = datetime.now()
@@ -400,15 +464,18 @@ def write_results(
     if len(odf) > 0:
         odf["%"] = 1.0
         # Using utf-8-sig to include BOM for Excel compatibility on Windows
-        odf_name = f"Asset-Map-Candidates{date_suffix}.csv"
+        odf_name = os.path.join(
+            working_directory, f"Asset-Map-Candidates{date_suffix}.csv"
+        )
         if not quiet:
             print(f"Outputting 'Other' Assets as '{odf_name}'")
         odf.to_csv(odf_name, index=False, encoding="utf-8-sig")
 
     # Output the Allocations with headers and totals for pretty report
     # Ensure output dir exists
-    os.makedirs("out", exist_ok=True)
-    rep_name = f"out/Van-Alloc-Rep{date_suffix}.csv"
+    output_directory = os.path.join(working_directory, constants.DEFAULT_OUTPUT_DIRECTORY)
+    os.makedirs(output_directory, exist_ok=True)
+    rep_name = os.path.join(output_directory, f"Van-Alloc-Rep{date_suffix}.csv")
     if not quiet:
         print(f"Outputting allocations as csv report: {rep_name}")
     vadf.to_csv(rep_name, index=False, encoding="utf-8-sig")
@@ -434,7 +501,7 @@ def write_results(
         vadf = vadf.sort_values(by=["Class"], kind="mergesort")
 
     # Output the ordered Allocations
-    alloc_name = f"out/Van-Alloc{date_suffix}.csv"
+    alloc_name = os.path.join(output_directory, f"Van-Alloc{date_suffix}.csv")
     if not quiet:
         print(f"Outputting sorted allocations without totals as csv: {alloc_name}")
     vadf.to_csv(alloc_name, index=False, encoding="utf-8-sig")

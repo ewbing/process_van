@@ -2,6 +2,7 @@
 
 import sys
 from unittest.mock import patch
+import os
 
 from datetime import datetime
 from pathlib import Path
@@ -30,13 +31,19 @@ def run_main_for_path_resolution(argv):
 def test_default_path_behavior():
     mock_validate, mock_read = run_main_for_path_resolution(["process_van.py", "-q"])
 
-    expected = f"data/{constants.DEFAULT_CSV_FILE}"
+    expected = os.path.abspath(
+        os.path.join(
+            os.path.expanduser(constants.DEFAULT_WORKING_DIRECTORY),
+            constants.DEFAULT_DOWNLOADS_DIRECTORY,
+            constants.DEFAULT_CSV_FILE,
+        )
+    )
     assert mock_validate.call_args.args[0] == expected
     assert mock_read.call_args.args[0] == expected
 
 
 def test_explicit_path_handling():
-    explicit_path = "tmp/portfolio.csv"
+    explicit_path = "/tmp/portfolio.csv"
     mock_validate, mock_read = run_main_for_path_resolution(
         ["process_van.py", "-q", "--csv-path", explicit_path]
     )
@@ -46,7 +53,7 @@ def test_explicit_path_handling():
 
 
 def test_positional_fallback_path_handling():
-    positional_path = "tmp/legacy-positional.csv"
+    positional_path = "/tmp/legacy-positional.csv"
     mock_validate, mock_read = run_main_for_path_resolution(
         ["process_van.py", "-q", positional_path]
     )
@@ -107,6 +114,7 @@ def test_cli_help_flag_prints_usage_and_exits_cleanly(capsys):
     captured = capsys.readouterr()
     assert exc_info.value.code == 0
     assert "usage:" in captured.out
+    assert "--working-dir" in captured.out
     assert "--csv-path" in captured.out
 
 
@@ -195,6 +203,8 @@ def test_cli_no_date_option_writes_non_suffixed_output_files(tmp_path, monkeypat
             "--asset_map",
             str(asset_map_path),
             "--no-date",
+            "--working-dir",
+            str(tmp_path),
         ],
     ):
         main()
@@ -230,6 +240,8 @@ def test_cli_custom_date_format_writes_formatted_suffix(tmp_path, monkeypatch):
                 str(asset_map_path),
                 "--date-format",
                 "%Y%m%d",
+                "--working-dir",
+                str(tmp_path),
             ],
         ):
             main()

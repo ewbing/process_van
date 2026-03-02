@@ -10,6 +10,8 @@
             "console": "integratedTerminal",
             "args": [
                 "--fixed",
+                "--working-dir",
+                "${workspaceFolder}/hogwarts_test",
                 "--csv-path",
                 "${workspaceFolder}/hogwarts_test/Hogwarts-DataExport.csv"
             ]
@@ -19,12 +21,10 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/process_van.py",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${env:HOME}/allocations",
             "console": "integratedTerminal",
             "args": [
-                "--fixed",
-                "--csv-path",
-                "${env:HOME}/allocations/Downloads/PortfolioWatchData.csv"
+                "--fixed"
             ]
         }
     ]

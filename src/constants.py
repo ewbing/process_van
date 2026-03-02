@@ -11,4 +11,8 @@ Licensed under the Apache License, Version 2.0
 """
 
 DEFAULT_CSV_FILE = "PortfolioWatchData.csv"
-DEFAULT_WORKING_DIRECTORY = "hogwarts_test"
+DEFAULT_WORKING_DIRECTORY = "~/allocations"
+DEFAULT_DOWNLOADS_DIRECTORY = "downloads"
+DEFAULT_OUTPUT_DIRECTORY = "out"
+DEFAULT_ASSET_MAP_FILE = "Asset-Map.csv"
+DEFAULT_CLASS_MAP_FILE = "Class-Map.csv"

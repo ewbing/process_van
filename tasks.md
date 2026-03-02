@@ -9,9 +9,10 @@ Tracking list for remaining issues and refactors.
 - [x] Add tests for default path behavior and explicit path handling.
 
 ## Add explicit working directory
- - [ ] Add parameter to allow working directory (default ~/allocations) - asset_maps at this level, subdirectories downloads and out
- - [ ] Update defaults and launch.json for working directory
- - [ ] Update readme for working directory
+ - [x] Add parameter to allow working directory (default ~/allocations) - asset_maps at this level, subdirectories downloads and out
+ - [x] Output full filepath in terminal
+ - [x] Update defaults and launch.json for working directory
+ - [x] Update readme for working directory
 
 ## CSV Schema Validation
 

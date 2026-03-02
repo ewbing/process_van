@@ -213,6 +213,8 @@ def test_hogwarts_subset_rows_are_present_in_full_pipeline_output(tmp_path, monk
             str(input_csv),
             "--class_map",
             str(class_map),
+            "--working-dir",
+            str(tmp_path),
         ],
     ):
         main()

@@ -17,7 +17,7 @@ is preferred because of its stability.
 
 ## Usage
 
-> `process_van.py [-h] [-q] [-f] [--csv-path CSV_PATH] [-am ASSET_MAP] [-cm CLASS_MAP] [--no-date] [--date-format DATE_FORMAT]`
+> `process_van.py [-h] [-q] [-f] [-wd WORKING_DIR] [--csv-path CSV_PATH] [-am ASSET_MAP] [-cm CLASS_MAP] [--no-date] [--date-format DATE_FORMAT]`
 
 ## Options
 
@@ -26,12 +26,17 @@ options:
   -h, --help            show this help message and exit
   -q, --quiet           quiet mode - no warnings or status
   -f, --fixed           Group CDs and Treasuries in Fixed
+  -wd WORKING_DIR, --working-dir WORKING_DIR
+                        base working directory for defaults (default
+                        user-home/allocations)
   --csv-path CSV_PATH   input export csv file from Vanguard assets (default
-                        data/PortfolioWatchData.csv)
+                        <working-dir>/downloads/PortfolioWatchData.csv)
   -am ASSET_MAP, --asset_map ASSET_MAP
-                        mapping file for assets
+                        mapping file for assets (default
+                        <working-dir>/Asset-Map.csv)
   -cm CLASS_MAP, --class_map CLASS_MAP
-                        mapping file for classes
+                        mapping file for classes (default
+                        <working-dir>/Class-Map.csv)
   --no-date             Do NOT append an ISO date (-YYYY-MM-DD) to output
                         filenames (default: append date)
   --date-format DATE_FORMAT
@@ -43,20 +48,27 @@ options:
 ## Examples
 
 ```bash
-# default input path: data/PortfolioWatchData.csv
+# default paths:
+#   input: <home>/allocations/downloads/PortfolioWatchData.csv
+#   class map: <home>/allocations/Class-Map.csv
+#   asset map: <home>/allocations/Asset-Map.csv
+#   outputs: <home>/allocations/out/*.csv
 .venv/bin/python src/process_van.py
 
 # explicit input path (recommended)
-.venv/bin/python src/process_van.py --csv-path ~/Downloads/PortfolioWatchData.csv
+.venv/bin/python src/process_van.py --csv-path <home>/allocations/downloads/PortfolioWatchData.csv
+
+# run from a custom working directory layout
+.venv/bin/python src/process_van.py --working-dir <home>/my-allocation-workdir
 
 # keep output filenames without date suffix
-.venv/bin/python src/process_van.py --csv-path ~/Downloads/PortfolioWatchData.csv --no-date
+.venv/bin/python src/process_van.py --csv-path <home>/allocations/downloads/PortfolioWatchData.csv --no-date
 ```
 
 Legacy positional input is still accepted for compatibility:
 
 ```bash
-.venv/bin/python src/process_van.py ~/Downloads/PortfolioWatchData.csv
+.venv/bin/python src/process_van.py <home>/allocations/downloads/PortfolioWatchData.csv
 ```
 
 ## CI Status
