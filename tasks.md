@@ -39,13 +39,14 @@ Tracking list for remaining issues and refactors.
 - [ ] Add regression test to verify pre-output DataFrame is unchanged.
 
 ## Test Coverage Expansion
-- [ ] Add tests for `read_csv_portfolio`.
-- [ ] Add tests for `csv_post_process`.
-- [ ] Add tests for `post_process`.
-- [ ] Add tests for `write_results` outputs and ordering behavior.
-- [ ] Add CLI tests for `-h`, missing file, and invalid map schemas.
-- [ ] Add tests for date suffix options: `--no-date` and `--date-format`.
-- [ ] Add full test using a subset of Hogwarts-Van-Alloc.csv
+- [x] Add tests for `read_csv_portfolio`.
+- [x] Add tests for `csv_post_process`.
+- [x] Add tests for `post_process`.
+- [x] Add tests for `write_results` outputs and ordering behavior.
+- [x] Add CLI tests for `-h`, missing file, and invalid map schemas.
+- [x] Add tests for date suffix options: `--no-date` and `--date-format`.
+- [x] Add full test using a subset of Hogwarts-Van-Alloc.csv
+- [ ] Switch Hogwarts test to fixture?
 
 ## Packaging and Dependencies
 
