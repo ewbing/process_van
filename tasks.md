@@ -22,9 +22,9 @@ Tracking list for remaining issues and refactors.
 
 ## Error Handling Consistency
 
-- [ ] Ensure malformed input errors are deterministic and readable (no raw pandas `KeyError` leaks).
-- [ ] Standardize helper behavior: raise exceptions in helpers, exit only in CLI entry path.
-- [ ] Add tests covering malformed portfolio/class-map/asset-map files.
+- [x] Ensure malformed input errors are deterministic and readable (no raw pandas `KeyError` leaks).
+- [x] Standardize helper behavior: raise exceptions in helpers, exit only in CLI entry path.
+- [x] Add tests covering malformed portfolio/class-map/asset-map files.
 
 
 ## Pipeline Refactor

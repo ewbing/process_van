@@ -16,6 +16,24 @@ import numpy as np
 import constants
 
 
+def ensure_dataframe_columns(
+    df: pd.DataFrame,
+    required_columns: list[str],
+    *,
+    data_name: str,
+) -> None:
+    """
+    Ensure a DataFrame contains required columns before downstream processing.
+    """
+    actual_columns = list(df.columns)
+    missing_columns = sorted(set(required_columns) - set(actual_columns))
+    if missing_columns:
+        raise ValueError(
+            f"{data_name} is missing required columns: {missing_columns}. "
+            f"Found: {actual_columns}."
+        )
+
+
 def validate_csv_schema(
     df: pd.DataFrame,
     expected_columns: list[str],
@@ -390,6 +408,12 @@ def csv_post_process(vadf) -> pd.DataFrame:
     Returns:
     pandas.DataFrame: The post-processed DataFrame with 'Class' column added and NaN values handled.
     """
+    ensure_dataframe_columns(
+        vadf,
+        ["Account Name", "Fund Name", "Symbol", "Value", "% of Portfolio"],
+        data_name="Portfolio data",
+    )
+
     # vadf.insert(0, "Class", np.where(vadf.Value == "Value", "Class", None))
     vadf.insert(0, "Class", vadf.Value.where(vadf.Value == "Value", None))
     # Force object dtype so later string assignments do not fail on numeric-heavy inputs.
@@ -439,6 +463,22 @@ def post_process(vadf, cmdf, amdf, fixed, quiet=False):
         4. Remaps any assets specified in `amdf` to their corresponding classes
         in the 'Class' column.
     """
+    ensure_dataframe_columns(
+        vadf,
+        ["Class", "Name", "Symbol"],
+        data_name="Portfolio post-process data",
+    )
+    ensure_dataframe_columns(
+        cmdf,
+        ["Class", "ClassMap"],
+        data_name="Class map data",
+    )
+    ensure_dataframe_columns(
+        amdf,
+        ["Name", "Class"],
+        data_name="Asset map data",
+    )
+
     # Null out Class for Subtotals & Totals - not needed?
     vadf.loc[
         vadf[(vadf.Symbol == "Subtotal:") | (vadf.Symbol == "Total:")].index, "Class"
@@ -497,6 +537,16 @@ def write_results(
         3) ordered report with consistent rows (for spreadsheet processing)
         4) report outputs for downstream spreadsheet processing
     """
+    ensure_dataframe_columns(
+        vadf,
+        ["Class", "Name", "Symbol"],
+        data_name="Portfolio output data",
+    )
+    ensure_dataframe_columns(
+        cmdf,
+        ["ClassMap", "Order"],
+        data_name="Class map output data",
+    )
 
     working_directory = resolve_working_directory_path(working_directory)
 
@@ -559,5 +609,17 @@ def write_results(
     vadf.to_csv(alloc_name, index=False, encoding="utf-8-sig")
 
 
+def cli_entrypoint() -> int:
+    """
+    CLI entrypoint that converts known user-input failures to non-zero exit.
+    """
+    try:
+        main()
+    except (FileNotFoundError, ValueError, pd.errors.ParserError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(cli_entrypoint())

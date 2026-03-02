@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from process_van import csv_post_process
+from process_van import cli_entrypoint
 from process_van import main
 from process_van import post_process
 from process_van import read_csv_portfolio
@@ -111,6 +112,23 @@ def test_csv_post_process_normalizes_rows_and_drops_nan_values():
     ]
 
 
+def test_csv_post_process_missing_required_columns_raises_value_error():
+    bad_df = pd.DataFrame(
+        {
+            "Account Name": ["Acct 1"],
+            "Symbol": ["AAA"],
+            "Value": [100.0],
+            "% of Portfolio": ["10.00%"],
+        }
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        csv_post_process(bad_df)
+    message = str(exc_info.value)
+    assert "Portfolio data is missing required columns" in message
+    assert "['Fund Name']" in message
+
+
 def test_post_process_applies_fixed_class_and_asset_overrides():
     vadf = pd.DataFrame(
         {
@@ -150,6 +168,29 @@ def test_post_process_applies_fixed_class_and_asset_overrides():
     assert vadf.loc[1, "Class"] == "U.S. stocks"
     assert vadf.loc[2, "Class"] == "Custom"
     assert pd.isna(vadf.loc[3, "Class"])
+
+
+def test_post_process_missing_asset_map_columns_raises_value_error():
+    vadf = pd.DataFrame(
+        {
+            "Class": ["U.S. stocks & stock funds"],
+            "Name": ["Stock Fund"],
+            "Symbol": ["S1"],
+        }
+    )
+    cmdf = pd.DataFrame(
+        {
+            "Class": ["U.S. stocks & stock funds"],
+            "ClassMap": ["U.S. stocks"],
+        }
+    )
+    bad_amdf = pd.DataFrame({"Name": ["Stock Fund"]})
+
+    with pytest.raises(ValueError) as exc_info:
+        post_process(vadf, cmdf, bad_amdf, fixed=False, quiet=True)
+    message = str(exc_info.value)
+    assert "Asset map data is missing required columns" in message
+    assert "['Class']" in message
 
 
 def test_write_results_outputs_candidates_report_and_sorted_alloc(tmp_path, monkeypatch):
@@ -216,6 +257,32 @@ def test_write_results_outputs_candidates_report_and_sorted_alloc(tmp_path, monk
         alloc_df.loc[alloc_df["Class"] == "U.S. stocks", "Name"].tolist()
         == ["Stock A", "Stock B"]
     )
+
+
+def test_write_results_missing_cmdf_columns_raises_value_error():
+    vadf = pd.DataFrame(
+        {
+            "Class": ["U.S. stocks"],
+            "Name": ["Stock A"],
+            "Symbol": ["AAA"],
+        }
+    )
+    bad_cmdf = pd.DataFrame({"ClassMap": ["U.S. stocks"]})
+
+    with pytest.raises(ValueError) as exc_info:
+        write_results(vadf, bad_cmdf, quiet=True, date_on=False)
+    message = str(exc_info.value)
+    assert "Class map output data is missing required columns" in message
+    assert "['Order']" in message
+
+
+def test_cli_entrypoint_returns_non_zero_and_prints_error(capsys):
+    with patch("process_van.main", side_effect=ValueError("bad csv schema")):
+        exit_code = cli_entrypoint()
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Error: bad csv schema" in captured.err
 
 
 def test_hogwarts_subset_rows_are_present_in_full_pipeline_output(tmp_path, monkeypatch):

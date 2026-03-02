@@ -155,6 +155,38 @@ def test_cli_invalid_class_map_schema_raises_value_error(tmp_path, monkeypatch):
     assert "Missing: ['Order']" in message
 
 
+def test_cli_invalid_portfolio_schema_raises_value_error(tmp_path, monkeypatch):
+    portfolio_path = tmp_path / "bad-portfolio.csv"
+    monkeypatch.chdir(tmp_path)
+
+    pd.DataFrame(
+        {
+            "Account Name": ["Acct A"],
+            "Fund Name": ["Fund A"],
+            "Symbol": ["AAA"],
+            "Value": [100.0],
+        }
+    ).to_csv(portfolio_path, index=False)
+
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "process_van.py",
+            "-q",
+            "--csv-path",
+            str(portfolio_path),
+            "--working-dir",
+            str(tmp_path),
+        ],
+    ):
+        with pytest.raises(ValueError) as exc_info:
+            main()
+    message = str(exc_info.value)
+    assert "Portfolio CSV" in message
+    assert "Missing: ['% of Portfolio']" in message
+
+
 def test_cli_invalid_asset_map_schema_raises_value_error(tmp_path, monkeypatch):
     portfolio_path = tmp_path / "portfolio.csv"
     class_map_path = tmp_path / "class-map.csv"
