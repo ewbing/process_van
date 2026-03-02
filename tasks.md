@@ -4,9 +4,14 @@ Tracking list for remaining issues and refactors.
 
 ## CLI and Input Handling
 
-- [ ] Replace positional `csv_path` with explicit `--csv-path` (optionally keep positional fallback).
-- [ ] Validate input path early with a clear error + expected filename/location hint.
-- [ ] Add tests for default path behavior and explicit path handling.
+- [x] Replace positional `csv_path` with explicit `--csv-path` (optionally keep positional fallback).
+- [x] Validate input path early with a clear error + expected filename/location hint.
+- [x] Add tests for default path behavior and explicit path handling.
+
+## Add explicit working directory
+ - [ ] Add parameter to allow working directory (default ~/allocations) - asset_maps at this level, subdirectories downloads and out
+ - [ ] Update defaults and launch.json for working directory
+ - [ ] Update readme for working directory
 
 ## CSV Schema Validation
 
@@ -19,6 +24,7 @@ Tracking list for remaining issues and refactors.
 - [ ] Ensure malformed input errors are deterministic and readable (no raw pandas `KeyError` leaks).
 - [ ] Standardize helper behavior: raise exceptions in helpers, exit only in CLI entry path.
 - [ ] Add tests covering malformed portfolio/class-map/asset-map files.
+
 
 ## Pipeline Refactor
 
@@ -33,13 +39,13 @@ Tracking list for remaining issues and refactors.
 - [ ] Add regression test to verify pre-output DataFrame is unchanged.
 
 ## Test Coverage Expansion
-
 - [ ] Add tests for `read_csv_portfolio`.
 - [ ] Add tests for `csv_post_process`.
 - [ ] Add tests for `post_process`.
 - [ ] Add tests for `write_results` outputs and ordering behavior.
 - [ ] Add CLI tests for `-h`, missing file, and invalid map schemas.
 - [ ] Add tests for date suffix options: `--no-date` and `--date-format`.
+- [ ] Add full test using a subset of Hogwarts-Van-Alloc.csv
 
 ## Packaging and Dependencies
 

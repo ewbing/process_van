@@ -1,25 +1,31 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "Python Debugger: Current File with defaults",
+            "name": "process_van: Hogwarts sample",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/src/process_van.py",
+            "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "args": "--fixed data/PortfolioWatchData.csv"
-        }
+            "args": [
+                "--fixed",
+                "--csv-path",
+                "${workspaceFolder}/hogwarts_test/Hogwarts-DataExport.csv"
+            ]
+        },
         {
-            "name": "Python Debugger: Hogwarts Data",
+            "name": "process_van: Vanguard download",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/src/process_van.py",
+            "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
-            "args": "--fixed data/PortfolioWatchData-Hogwarts.csv"
+            "args": [
+                "--fixed",
+                "--csv-path",
+                "${env:HOME}/allocations/Downloads/PortfolioWatchData.csv"
+            ]
         }
     ]
 }

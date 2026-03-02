@@ -15,6 +15,36 @@ import numpy as np
 import constants
 
 
+def resolve_input_csv_path(csv_path: str | None, csv_path_positional: str | None) -> str:
+    """
+    Resolve the portfolio CSV input path from explicit and positional CLI arguments.
+
+    Precedence:
+        1) --csv-path
+        2) positional fallback
+        3) default data/PortfolioWatchData.csv
+    """
+    if csv_path:
+        return csv_path
+    if csv_path_positional:
+        return csv_path_positional
+    return f"data/{constants.DEFAULT_CSV_FILE}"
+
+
+def validate_input_csv_path(csv_path: str) -> None:
+    """
+    Validate that the input CSV path exists before running the processing pipeline.
+    """
+    if not os.path.isfile(csv_path):
+        expected_name = constants.DEFAULT_CSV_FILE
+        expected_dir = os.path.abspath(os.path.dirname(csv_path) or ".")
+        raise FileNotFoundError(
+            f'Input CSV file not found at "{csv_path}". '
+            f'Expected a Vanguard export named "{expected_name}" in "{expected_dir}", '
+            f'or pass --csv-path /path/to/{expected_name}.'
+        )
+
+
 def main():
     """
     This program processes Vanguard allocation reports into consistent rows and adds
@@ -37,10 +67,18 @@ def main():
         "-f", "--fixed", help="Group CDs and Treasuries in Fixed", action="store_true"
     )
     parser.add_argument(
-        "csv_path",
+        "--csv-path",
+        dest="csv_path",
+        default=None,
+        help=(
+            "input export csv file from Vanguard assets "
+            f"(default data/{constants.DEFAULT_CSV_FILE})"
+        ),
+    )
+    parser.add_argument(
+        "csv_path_positional",
         nargs="?",
-        help="input file from Vanguard assets (csv)",
-        default=f"data/{constants.DEFAULT_CSV_FILE}",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "-am", "--asset_map", help="mapping file for assets", default="Asset-Map.csv"
@@ -73,8 +111,11 @@ def main():
     if not args.quiet:
         print("CSV mode")
 
+    resolved_csv_path = resolve_input_csv_path(args.csv_path, args.csv_path_positional)
+    validate_input_csv_path(resolved_csv_path)
+
     # Bring in (required) input file
-    vadf = read_csv_portfolio(args.csv_path)
+    vadf = read_csv_portfolio(resolved_csv_path)
 
     # Bring in (semi-optional) Class Map - provides / overrides mapping for specific classes
     cmdf = read_class_map(args.class_map, args.quiet)
@@ -242,13 +283,16 @@ def csv_post_process(vadf) -> pd.DataFrame:
     """
     # vadf.insert(0, "Class", np.where(vadf.Value == "Value", "Class", None))
     vadf.insert(0, "Class", vadf.Value.where(vadf.Value == "Value", None))
+    # Force object dtype so later string assignments do not fail on numeric-heavy inputs.
+    vadf["Class"] = vadf["Class"].astype("object")
 
     # Rename Account Name to Account and Fund Name to Name for consistency
     vadf.rename(columns={"Account Name": "Account", "Fund Name": "Name"}, inplace=True)
 
     # vadf.loc[vadf.Account.isnull(),'Class']=vadf.Name
     # Assign the value in Account over to the Class column if the Name is null
-    vadf.loc[vadf.Name.isnull(), "Class"] = vadf["Account"]
+    null_name_mask = vadf["Name"].isnull()
+    vadf.loc[null_name_mask, "Class"] = vadf.loc[null_name_mask, "Account"]
 
     # Propagate Class down
     # Avoid inplace on a Series to prevent chained-assignment FutureWarning
@@ -349,9 +393,10 @@ def write_results(
         date_suffix = ""
 
     # Any Class still starting with 'Other' are candidates for mapping - output the candidates
-    odf = vadf.dropna(subset=["Class"])[vadf.Class.str.startswith("Other").dropna()][
-        ["Name", "Class"]
-    ].reset_index(drop=True)
+    other_mask = vadf["Class"].fillna("").str.startswith("Other")
+    odf = vadf.loc[other_mask, ["Name", "Class"]].dropna(subset=["Class"]).reset_index(
+        drop=True
+    )
     if len(odf) > 0:
         odf["%"] = 1.0
         # Using utf-8-sig to include BOM for Excel compatibility on Windows

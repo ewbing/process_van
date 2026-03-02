@@ -17,22 +17,46 @@ is preferred because of its stability.
 
 ## Usage
 
-> `process_van.py [-h] [-q] [-f] [-am ASSET_MAP] [-cm CLASS_MAP] [csv_path]`
+> `process_van.py [-h] [-q] [-f] [--csv-path CSV_PATH] [-am ASSET_MAP] [-cm CLASS_MAP] [--no-date] [--date-format DATE_FORMAT]`
 
 ## Options
 
 ```text
-positional arguments:
-  csv_path              input export csv file from Vanguard assets (default data/PortfolioWatchData.csv) 
-
-other arguments:
+options:
   -h, --help            show this help message and exit
   -q, --quiet           quiet mode - no warnings or status
   -f, --fixed           Group CDs and Treasuries in Fixed
+  --csv-path CSV_PATH   input export csv file from Vanguard assets (default
+                        data/PortfolioWatchData.csv)
   -am ASSET_MAP, --asset_map ASSET_MAP
                         mapping file for assets
   -cm CLASS_MAP, --class_map CLASS_MAP
                         mapping file for classes
+  --no-date             Do NOT append an ISO date (-YYYY-MM-DD) to output
+                        filenames (default: append date)
+  --date-format DATE_FORMAT
+                        strftime format for the date suffix (default:
+                        %Y-%m-%d). Do not include a leading '-' (it's added
+                        automatically).
+```
+
+## Examples
+
+```bash
+# default input path: data/PortfolioWatchData.csv
+.venv/bin/python src/process_van.py
+
+# explicit input path (recommended)
+.venv/bin/python src/process_van.py --csv-path ~/Downloads/PortfolioWatchData.csv
+
+# keep output filenames without date suffix
+.venv/bin/python src/process_van.py --csv-path ~/Downloads/PortfolioWatchData.csv --no-date
+```
+
+Legacy positional input is still accepted for compatibility:
+
+```bash
+.venv/bin/python src/process_van.py ~/Downloads/PortfolioWatchData.csv
 ```
 
 ## CI Status
