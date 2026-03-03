@@ -242,7 +242,8 @@ def main():
         default=None,
         help=(
             "input export csv file from Vanguard assets "
-            f"(default <working-dir>/{constants.DEFAULT_DOWNLOADS_DIRECTORY}/{constants.DEFAULT_CSV_FILE})"
+            f"(default <working-dir>/{constants.DEFAULT_DOWNLOADS_DIRECTORY}/"
+            f"{constants.DEFAULT_CSV_FILE})"
         ),
     )
     parser.add_argument(
@@ -585,7 +586,7 @@ def write_results(
         print(f"Outputting allocations as csv report: {rep_name}")
     report_df.to_csv(rep_name, index=False, encoding="utf-8-sig")
 
-    # Build alloc_df explicitly instead of mutating the source frame.  
+    # Build alloc_df explicitly instead of mutating the source frame.
     # This is the spreadsheet form for use in spreadsheets
     alloc_df = report_df.loc[
         (report_df.Symbol != "Subtotal:")
