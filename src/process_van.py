@@ -129,6 +129,82 @@ def validate_input_csv_path(csv_path: str) -> None:
         )
 
 
+def load_inputs(
+    csv_path: str,
+    class_map_path: str,
+    asset_map_path: str,
+    *,
+    quiet: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Load all input dataframes used in the processing pipeline.
+    """
+    portfolio_df = read_csv_portfolio(csv_path)
+    class_map_df = read_class_map(class_map_path, quiet)
+    asset_map_df = read_asset_map(asset_map_path, quiet)
+    return portfolio_df, class_map_df, asset_map_df
+
+
+def normalize_portfolio_rows(portfolio_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize portfolio rows from raw CSV shape into processing shape.
+    """
+    return csv_post_process(portfolio_df.copy())
+
+
+def apply_class_mappings(
+    normalized_df: pd.DataFrame,
+    class_map_df: pd.DataFrame,
+    asset_map_df: pd.DataFrame,
+    fixed: bool,
+    quiet: bool = False,
+) -> pd.DataFrame:
+    """
+    Apply fixed-income, class-level, and asset-level mapping transforms.
+    Returns a new dataframe and does not mutate inputs.
+    """
+    ensure_dataframe_columns(
+        normalized_df,
+        ["Class", "Name", "Symbol"],
+        data_name="Portfolio post-process data",
+    )
+    ensure_dataframe_columns(
+        class_map_df,
+        ["Class", "ClassMap"],
+        data_name="Class map data",
+    )
+    ensure_dataframe_columns(
+        asset_map_df,
+        ["Name", "Class"],
+        data_name="Asset map data",
+    )
+
+    mapped_df = normalized_df.copy()
+
+    # Null out Class for Subtotals & Totals - not needed?
+    subtotal_or_total = (mapped_df.Symbol == "Subtotal:") | (mapped_df.Symbol == "Total:")
+    mapped_df.loc[mapped_df[subtotal_or_total].index, "Class"] = np.nan
+
+    if fixed:
+        if not quiet:
+            print("Fixed mode")
+        mapped_df["Name"] = mapped_df["Name"].fillna("None")
+        fixed_regex = re.compile(r"(UNITED STATES TREAS|CPN|NTS)")
+        mapped_df["Class"] = mapped_df.apply(
+            lambda row: "Fixed" if fixed_regex.search(row.Name) else row.Class,
+            axis=1,
+        )
+
+    mapped_df.loc[mapped_df["Class"].isin(class_map_df.Class), "Class"] = mapped_df[
+        "Class"
+    ].map(dict(zip(class_map_df.Class, class_map_df.ClassMap)))
+
+    mapped_df.loc[mapped_df["Name"].isin(asset_map_df.Name), "Class"] = mapped_df[
+        "Name"
+    ].map(dict(zip(asset_map_df.Name, asset_map_df.Class)))
+    return mapped_df
+
+
 def main():
     """
     This program processes Vanguard allocation reports into consistent rows and adds
@@ -223,30 +299,27 @@ def main():
     )
     validate_input_csv_path(resolved_csv_path)
 
-    # Bring in (required) input file
-    vadf = read_csv_portfolio(resolved_csv_path)
-
-    # Bring in (semi-optional) Class Map - provides / overrides mapping for specific classes
-    cmdf = read_class_map(resolved_class_map_path, args.quiet)
-
-    # Bring in (optional) Asset Map - provides / overrides mapping for specific assets to classes
-    # A new candidate file will be output later on as Asset-Map-Candidates.csv
-    amdf = read_asset_map(resolved_asset_map_path, args.quiet)
-
-    # CSV post processing
-    vadf = csv_post_process(vadf)
-
-    # Common post processing
-    post_process(vadf, cmdf, amdf, args.fixed, args.quiet)
-
-    # Write results out (pass date-suffix preference and format)
-    write_results(
-        vadf,
-        cmdf,
+    portfolio_df, class_map_df, asset_map_df = load_inputs(
+        resolved_csv_path,
+        resolved_class_map_path,
+        resolved_asset_map_path,
+        quiet=args.quiet,
+    )
+    normalized_df = normalize_portfolio_rows(portfolio_df)
+    processed_df = apply_class_mappings(
+        normalized_df,
+        class_map_df,
+        asset_map_df,
+        args.fixed,
         args.quiet,
-        args.date_suffix,
-        args.date_format,
-        working_directory,
+    )
+    write_results(
+        processed_df,
+        class_map_df,
+        quiet=args.quiet,
+        date_on=args.date_suffix,
+        date_format=args.date_format,
+        working_directory=working_directory,
     )
 
 def read_asset_map(asset_map_path: str, quiet: bool = False) -> pd.DataFrame:
@@ -437,80 +510,6 @@ def csv_post_process(vadf) -> pd.DataFrame:
     return vadf
 
 
-def post_process(vadf, cmdf, amdf, fixed, quiet=False):
-    """
-    Post-process the given DataFrame `vadf` by performing various operations on it.
-
-    Args:
-        vadf (pandas.DataFrame): The DataFrame to be post-processed.
-        cmdf (pandas.DataFrame): The DataFrame containing classification information.
-        amdf (pandas.DataFrame): The DataFrame containing asset information.
-        fixed (bool): A flag indicating whether to process fixed assets.
-        quiet (bool, optional): A flag indicating whether to suppress output. Defaults to False.
-
-    Returns:
-        None
-
-    Description:
-        This function performs the following operations on the given DataFrame `vadf`:
-
-        1. Nulls out the 'Class' column for rows with 'Subtotal:' or 'Total:'
-        in the 'Symbol' column.
-        2. If `fixed` is True, checks for fixed income assets in the 'Name' column
-        and remaps them to 'Fixed' in the 'Class' column.
-        3. Remaps any classes specified in `cmdf` to their corresponding class maps
-        in the 'Class' column.
-        4. Remaps any assets specified in `amdf` to their corresponding classes
-        in the 'Class' column.
-    """
-    ensure_dataframe_columns(
-        vadf,
-        ["Class", "Name", "Symbol"],
-        data_name="Portfolio post-process data",
-    )
-    ensure_dataframe_columns(
-        cmdf,
-        ["Class", "ClassMap"],
-        data_name="Class map data",
-    )
-    ensure_dataframe_columns(
-        amdf,
-        ["Name", "Class"],
-        data_name="Asset map data",
-    )
-
-    # Null out Class for Subtotals & Totals - not needed?
-    vadf.loc[
-        vadf[(vadf.Symbol == "Subtotal:") | (vadf.Symbol == "Total:")].index, "Class"
-    ] = np.nan
-
-    # Deal with fixed assets
-    if fixed:
-        if not quiet:
-            print("Fixed mode")
-        # should never have NaN in the Name column, but if we do...
-        # Avoid inplace on a Series to prevent chained-assignment FutureWarning
-        vadf["Name"] = vadf["Name"].fillna("None")
-
-        # Use this expression to check for fixed income assets
-        fixed_regex = re.compile(r"(UNITED STATES TREAS|CPN|NTS)")
-        # remap fixed securities to 'Fixed'
-        vadf["Class"] = vadf.apply(
-            lambda row: "Fixed" if fixed_regex.search(row.Name) else row.Class,
-            axis=1,
-        )
-
-    # remap any Classes to classes specified in cmdf
-    vadf.loc[vadf["Class"].isin(cmdf.Class), "Class"] = vadf["Class"].map(
-        dict(zip(cmdf.Class, cmdf.ClassMap))
-    )
-
-    # remap any Assets to classes specifed in amdf
-    vadf.loc[vadf["Name"].isin(amdf.Name), "Class"] = vadf["Name"].map(
-        dict(zip(amdf.Name, amdf.Class))
-    )
-
-
 def write_results(
     vadf,
     cmdf,
@@ -558,20 +557,24 @@ def write_results(
     else:
         date_suffix = ""
 
-    # Any Class still starting with 'Other' are candidates for mapping - output the candidates
-    other_mask = vadf["Class"].fillna("").str.startswith("Other")
-    odf = vadf.loc[other_mask, ["Name", "Class"]].dropna(subset=["Class"]).reset_index(
-        drop=True
+    # Keep output paths pure by deriving explicit output DataFrames from the input.
+    report_df = vadf.copy()
+
+    other_mask = report_df["Class"].fillna("").str.startswith("Other")
+    candidates_df = (
+        report_df.loc[other_mask, ["Name", "Class"]]
+        .dropna(subset=["Class"])
+        .reset_index(drop=True)
     )
-    if len(odf) > 0:
-        odf["%"] = 1.0
+    if len(candidates_df) > 0:
+        candidates_df["%"] = 1.0
         # Using utf-8-sig to include BOM for Excel compatibility on Windows
         odf_name = os.path.join(
             working_directory, f"Asset-Map-Candidates{date_suffix}.csv"
         )
         if not quiet:
             print(f"Outputting 'Other' Assets as '{odf_name}'")
-        odf.to_csv(odf_name, index=False, encoding="utf-8-sig")
+        candidates_df.to_csv(odf_name, index=False, encoding="utf-8-sig")
 
     # Output the Allocations with headers and totals for pretty report
     # Ensure output dir exists
@@ -580,33 +583,31 @@ def write_results(
     rep_name = os.path.join(output_directory, f"Van-Alloc-Rep{date_suffix}.csv")
     if not quiet:
         print(f"Outputting allocations as csv report: {rep_name}")
-    vadf.to_csv(rep_name, index=False, encoding="utf-8-sig")
+    report_df.to_csv(rep_name, index=False, encoding="utf-8-sig")
 
-    # Remove rows with Headers, Subtotals & Totals
-    vadf.drop(
-        vadf[
-            (vadf.Symbol == "Subtotal:")
-            | (vadf.Symbol == "Total:")
-            | (vadf.Name == "Name")
-        ].index,
-        inplace=True,
-    )
+    # Build alloc_df explicitly instead of mutating the source frame.  
+    # This is the spreadsheet form for use in spreadsheets
+    alloc_df = report_df.loc[
+        (report_df.Symbol != "Subtotal:")
+        & (report_df.Symbol != "Total:")
+        & (report_df.Name != "Name")
+    ].copy()
     # Sort by cl_dict using mergesort (to maintain the current order) - use
     # ClassMap ordering if non-nulls
     if cmdf.Order.notnull().values.sum() > 0:
-        vadf = vadf.sort_values(
+        alloc_df = alloc_df.sort_values(
             by=["Class"],
             kind="mergesort",
             key=lambda x: x.map(dict(zip(cmdf.ClassMap, cmdf.Order))),
         )
     else:
-        vadf = vadf.sort_values(by=["Class"], kind="mergesort")
+        alloc_df = alloc_df.sort_values(by=["Class"], kind="mergesort")
 
     # Output the ordered Allocations
     alloc_name = os.path.join(output_directory, f"Van-Alloc{date_suffix}.csv")
     if not quiet:
         print(f"Outputting sorted allocations without totals as csv: {alloc_name}")
-    vadf.to_csv(alloc_name, index=False, encoding="utf-8-sig")
+    alloc_df.to_csv(alloc_name, index=False, encoding="utf-8-sig")
 
 
 def cli_entrypoint() -> int:

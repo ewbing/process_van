@@ -29,15 +29,15 @@ Tracking list for remaining issues and refactors.
 
 ## Pipeline Refactor
 
-- [ ] Split processing into smaller functions: `load_inputs`, `normalize_portfolio_rows`, `apply_class_mappings`, `write_outputs`.
-- [ ] Prefer pure DataFrame transforms and reduce cross-function side effects.
-- [ ] Simplify `main()` to orchestration only.
+- [x] Split processing into smaller functions: `load_inputs`, `normalize_portfolio_rows`, `apply_class_mappings`, `write_outputs`.
+- [x] Prefer pure DataFrame transforms and reduce cross-function side effects.
+- [x] Simplify `main()` to orchestration only.
 
 ## Output-Path Refactor
 
-- [ ] Remove in-place mutation in `write_results`.
-- [ ] Use explicit derived frames (`report_df`, `alloc_df`, `candidates_df`) before writing.
-- [ ] Add regression test to verify pre-output DataFrame is unchanged.
+- [x] Remove in-place mutation in `write_results`.
+- [x] Use explicit derived frames (`report_df`, `alloc_df`, `candidates_df`) before writing.
+- [x] Add regression test to verify pre-output DataFrame is unchanged.
 
 ## Test Coverage Expansion
 - [x] Add tests for `read_csv_portfolio`.

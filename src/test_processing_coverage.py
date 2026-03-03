@@ -10,7 +10,8 @@ import pytest
 from process_van import csv_post_process
 from process_van import cli_entrypoint
 from process_van import main
-from process_van import post_process
+from process_van import apply_class_mappings
+from process_van import normalize_portfolio_rows
 from process_van import read_csv_portfolio
 from process_van import write_results
 
@@ -129,8 +130,8 @@ def test_csv_post_process_missing_required_columns_raises_value_error():
     assert "['Fund Name']" in message
 
 
-def test_post_process_applies_fixed_class_and_asset_overrides():
-    vadf = pd.DataFrame(
+def test_apply_class_mappings_applies_fixed_class_and_asset_overrides():
+    input_df = pd.DataFrame(
         {
             "Class": [
                 "U.S. bonds & bond funds",
@@ -162,16 +163,65 @@ def test_post_process_applies_fixed_class_and_asset_overrides():
     )
     amdf = pd.DataFrame({"Name": ["Asset Override"], "Class": ["Custom"], "%": [1.0]})
 
-    post_process(vadf, cmdf, amdf, fixed=True, quiet=True)
+    actual_df = apply_class_mappings(input_df, cmdf, amdf, fixed=True, quiet=True)
 
-    assert vadf.loc[0, "Class"] == "Fixed"
-    assert vadf.loc[1, "Class"] == "U.S. stocks"
-    assert vadf.loc[2, "Class"] == "Custom"
-    assert pd.isna(vadf.loc[3, "Class"])
+    assert actual_df.loc[0, "Class"] == "Fixed"
+    assert actual_df.loc[1, "Class"] == "U.S. stocks"
+    assert actual_df.loc[2, "Class"] == "Custom"
+    assert pd.isna(actual_df.loc[3, "Class"])
 
 
-def test_post_process_missing_asset_map_columns_raises_value_error():
-    vadf = pd.DataFrame(
+def test_apply_class_mappings_returns_new_dataframe_without_mutating_input():
+    input_df = pd.DataFrame(
+        {
+            "Class": ["U.S. stocks & stock funds", "Other asset types"],
+            "Name": ["Stock Fund", "Needs Mapping"],
+            "Symbol": ["S1", "Subtotal:"],
+            "Value": [100.0, 100.0],
+            "Account": ["A", "B"],
+            "% of Portfolio": ["1%", "1%"],
+        }
+    )
+    class_map_df = pd.DataFrame(
+        {"Class": ["U.S. stocks & stock funds"], "ClassMap": ["U.S. stocks"]}
+    )
+    asset_map_df = pd.DataFrame({"Name": ["Stock Fund"], "Class": ["Custom"], "%": [1.0]})
+
+    original_df = input_df.copy(deep=True)
+    actual_df = apply_class_mappings(input_df, class_map_df, asset_map_df, fixed=False, quiet=True)
+
+    assert input_df.equals(original_df)
+    assert actual_df.loc[0, "Class"] == "Custom"
+    assert pd.isna(actual_df.loc[1, "Class"])
+
+
+def test_normalize_portfolio_rows_returns_new_dataframe_without_mutating_input():
+    input_df = pd.DataFrame(
+        {
+            "Account Name": ["U.S. stocks & stock funds", "Acct 1", None],
+            "Fund Name": [None, "Fund A", None],
+            "Symbol": [None, "AAA", "Subtotal:"],
+            "Value": [None, 100.0, 100.0],
+            "% of Portfolio": [None, "10.00%", "10.00%"],
+        }
+    )
+    original_df = input_df.copy(deep=True)
+
+    actual_df = normalize_portfolio_rows(input_df)
+
+    assert input_df.equals(original_df)
+    assert actual_df.columns.tolist() == [
+        "Class",
+        "Account",
+        "Name",
+        "Symbol",
+        "Value",
+        "% of Portfolio",
+    ]
+
+
+def test_apply_class_mappings_missing_asset_map_columns_raises_value_error():
+    input_df = pd.DataFrame(
         {
             "Class": ["U.S. stocks & stock funds"],
             "Name": ["Stock Fund"],
@@ -187,7 +237,7 @@ def test_post_process_missing_asset_map_columns_raises_value_error():
     bad_amdf = pd.DataFrame({"Name": ["Stock Fund"]})
 
     with pytest.raises(ValueError) as exc_info:
-        post_process(vadf, cmdf, bad_amdf, fixed=False, quiet=True)
+        apply_class_mappings(input_df, cmdf, bad_amdf, fixed=False, quiet=True)
     message = str(exc_info.value)
     assert "Asset map data is missing required columns" in message
     assert "['Class']" in message
@@ -257,6 +307,29 @@ def test_write_results_outputs_candidates_report_and_sorted_alloc(tmp_path, monk
         alloc_df.loc[alloc_df["Class"] == "U.S. stocks", "Name"].tolist()
         == ["Stock A", "Stock B"]
     )
+
+
+def test_write_results_does_not_mutate_input_dataframe(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    input_df = pd.DataFrame(
+        {
+            "Class": ["U.S. stocks", "U.S. stocks"],
+            "Name": ["Stock A", "Subtotal row"],
+            "Account": ["A", "B"],
+            "Symbol": ["A", "Subtotal:"],
+            "Value": [20.0, 20.0],
+            "% of Portfolio": ["20%", "20%"],
+        }
+    )
+    class_map_df = pd.DataFrame(
+        {"Class": ["U.S. stocks"], "ClassMap": ["U.S. stocks"], "Order": ["1"]}
+    )
+    original_df = input_df.copy(deep=True)
+
+    write_results(input_df, class_map_df, quiet=True, date_on=False, working_directory=str(tmp_path))
+
+    assert input_df.equals(original_df)
 
 
 def test_write_results_missing_cmdf_columns_raises_value_error():
