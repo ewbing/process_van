@@ -8,12 +8,25 @@ import sys
 import os
 from datetime import datetime
 import argparse
+from dataclasses import dataclass
 import re
 import warnings
 import pandas as pd
 import numpy as np
 
 import constants
+
+
+@dataclass(frozen=True)
+class OutputOptions:
+    """
+    Output configuration for report writers.
+    """
+
+    quiet: bool = False
+    date_on: bool = True
+    date_format: str = "%Y-%m-%d"
+    working_directory: str = "."
 
 
 def ensure_dataframe_columns(
@@ -314,14 +327,13 @@ def main():
         args.fixed,
         args.quiet,
     )
-    write_results(
-        processed_df,
-        class_map_df,
+    output_options = OutputOptions(
         quiet=args.quiet,
         date_on=args.date_suffix,
         date_format=args.date_format,
         working_directory=working_directory,
     )
+    write_results(processed_df, class_map_df, output_options)
 
 def read_asset_map(asset_map_path: str, quiet: bool = False) -> pd.DataFrame:
     """
@@ -511,24 +523,100 @@ def csv_post_process(vadf) -> pd.DataFrame:
     return vadf
 
 
+def build_date_suffix(date_on: bool, date_format: str) -> str:
+    """
+    Build output date suffix for filenames.
+    """
+    if not date_on:
+        return ""
+    return f"-{datetime.now().strftime(date_format)}"
+
+
+def write_candidates_csv(
+    report_df: pd.DataFrame, working_directory: str, date_suffix: str, quiet: bool
+) -> None:
+    """
+    Write "Other" class rows as next-run asset map candidates.
+    """
+    other_mask = report_df["Class"].fillna("").str.startswith("Other")
+    candidates_df = (
+        report_df.loc[other_mask, ["Name", "Class"]]
+        .dropna(subset=["Class"])
+        .reset_index(drop=True)
+    )
+    if len(candidates_df) == 0:
+        return
+
+    candidates_df["%"] = 1.0
+    output_name = os.path.join(working_directory, f"Asset-Map-Candidates{date_suffix}.csv")
+    if not quiet:
+        print(f"Outputting 'Other' Assets as '{output_name}'")
+    candidates_df.to_csv(output_name, index=False, encoding="utf-8-sig")
+
+
+def write_report_csv(
+    report_df: pd.DataFrame, working_directory: str, date_suffix: str, quiet: bool
+) -> str:
+    """
+    Write report output and return the directory used for outputs.
+    """
+    output_directory = os.path.join(working_directory, constants.DEFAULT_OUTPUT_DIRECTORY)
+    os.makedirs(output_directory, exist_ok=True)
+    report_name = os.path.join(output_directory, f"Van-Alloc-Rep{date_suffix}.csv")
+    if not quiet:
+        print(f"Outputting allocations as csv report: {report_name}")
+    report_df.to_csv(report_name, index=False, encoding="utf-8-sig")
+    return output_directory
+
+
+def write_sorted_allocations_csv(
+    report_df: pd.DataFrame,
+    cmdf: pd.DataFrame,
+    output_directory: str,
+    date_suffix: str,
+    quiet: bool,
+) -> pd.DataFrame:
+    """
+    Write sorted allocation CSV without subtotal/total rows.
+    """
+    alloc_df = report_df.loc[
+        (report_df.Symbol != "Subtotal:")
+        & (report_df.Symbol != "Total:")
+        & (report_df.Name != "Name")
+    ].copy()
+    # Sort by cl_dict using mergesort (to maintain the current order) - use
+    # ClassMap ordering if non-nulls
+    if cmdf.Order.notnull().values.sum() > 0:
+        alloc_df = alloc_df.sort_values(
+            by=["Class"],
+            kind="mergesort",
+            key=lambda x: x.map(dict(zip(cmdf.ClassMap, cmdf.Order))),
+        )
+    else:
+        alloc_df = alloc_df.sort_values(by=["Class"], kind="mergesort")
+
+    output_name = os.path.join(output_directory, f"Van-Alloc{date_suffix}.csv")
+    if not quiet:
+        print(f"Outputting sorted allocations without totals as csv: {output_name}")
+    alloc_df.to_csv(output_name, index=False, encoding="utf-8-sig")
+    return alloc_df
+
+
 def write_results(
-    vadf,
-    cmdf,
-    quiet=False,
-    date_on: bool = True,
-    date_format: str = "%Y-%m-%d",
-    working_directory: str = ".",
-):
+    vadf: pd.DataFrame,
+    cmdf: pd.DataFrame,
+    options: OutputOptions,
+) -> pd.DataFrame:
     """
     Writes the results of the asset allocation to various files.
 
     Parameters:
         vadf (DataFrame): The DataFrame containing the asset allocation data.
         cmdf (DataFrame): The DataFrame containing the command file data.
-        quiet (bool, optional): If True, suppresses the output messages. Defaults to False.
+        options (OutputOptions): Output config and path settings.
 
     Returns:
-        None
+        pd.DataFrame: Final sorted allocations DataFrame without subtotal/total rows.
 
     Description:
         This function writes the results of the asset allocation out:
@@ -548,67 +636,17 @@ def write_results(
         data_name="Class map output data",
     )
 
-    working_directory = resolve_working_directory_path(working_directory)
-
-    # Build an ISO date suffix for output files when enabled: -YYYY-MM-DD
-    if date_on:
-        now = datetime.now()
-        # date_format is an strftime fragment, add leading '-' automatically
-        date_suffix = f"-{now.strftime(date_format)}"
-    else:
-        date_suffix = ""
-
+    working_directory = resolve_working_directory_path(options.working_directory)
+    date_suffix = build_date_suffix(options.date_on, options.date_format)
     # Keep output paths pure by deriving explicit output DataFrames from the input.
     report_df = vadf.copy()
-
-    other_mask = report_df["Class"].fillna("").str.startswith("Other")
-    candidates_df = (
-        report_df.loc[other_mask, ["Name", "Class"]]
-        .dropna(subset=["Class"])
-        .reset_index(drop=True)
+    write_candidates_csv(report_df, working_directory, date_suffix, options.quiet)
+    output_directory = write_report_csv(
+        report_df, working_directory, date_suffix, options.quiet
     )
-    if len(candidates_df) > 0:
-        candidates_df["%"] = 1.0
-        # Using utf-8-sig to include BOM for Excel compatibility on Windows
-        odf_name = os.path.join(
-            working_directory, f"Asset-Map-Candidates{date_suffix}.csv"
-        )
-        if not quiet:
-            print(f"Outputting 'Other' Assets as '{odf_name}'")
-        candidates_df.to_csv(odf_name, index=False, encoding="utf-8-sig")
-
-    # Output the Allocations with headers and totals for pretty report
-    # Ensure output dir exists
-    output_directory = os.path.join(working_directory, constants.DEFAULT_OUTPUT_DIRECTORY)
-    os.makedirs(output_directory, exist_ok=True)
-    rep_name = os.path.join(output_directory, f"Van-Alloc-Rep{date_suffix}.csv")
-    if not quiet:
-        print(f"Outputting allocations as csv report: {rep_name}")
-    report_df.to_csv(rep_name, index=False, encoding="utf-8-sig")
-
-    # Build alloc_df explicitly instead of mutating the source frame.
-    # This is the spreadsheet form for use in spreadsheets
-    alloc_df = report_df.loc[
-        (report_df.Symbol != "Subtotal:")
-        & (report_df.Symbol != "Total:")
-        & (report_df.Name != "Name")
-    ].copy()
-    # Sort by cl_dict using mergesort (to maintain the current order) - use
-    # ClassMap ordering if non-nulls
-    if cmdf.Order.notnull().values.sum() > 0:
-        alloc_df = alloc_df.sort_values(
-            by=["Class"],
-            kind="mergesort",
-            key=lambda x: x.map(dict(zip(cmdf.ClassMap, cmdf.Order))),
-        )
-    else:
-        alloc_df = alloc_df.sort_values(by=["Class"], kind="mergesort")
-
-    # Output the ordered Allocations
-    alloc_name = os.path.join(output_directory, f"Van-Alloc{date_suffix}.csv")
-    if not quiet:
-        print(f"Outputting sorted allocations without totals as csv: {alloc_name}")
-    alloc_df.to_csv(alloc_name, index=False, encoding="utf-8-sig")
+    return write_sorted_allocations_csv(
+        report_df, cmdf, output_directory, date_suffix, options.quiet
+    )
 
 
 def cli_entrypoint() -> int:

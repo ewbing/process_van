@@ -12,6 +12,7 @@ from process_van import cli_entrypoint
 from process_van import main
 from process_van import apply_class_mappings
 from process_van import normalize_portfolio_rows
+from process_van import OutputOptions
 from process_van import read_csv_portfolio
 from process_van import write_results
 
@@ -279,7 +280,7 @@ def test_write_results_outputs_candidates_report_and_sorted_alloc(tmp_path, monk
         }
     )
 
-    write_results(vadf, cmdf, quiet=True, date_on=False)
+    write_results(vadf, cmdf, OutputOptions(quiet=True, date_on=False))
 
     candidates_path = tmp_path / "Asset-Map-Candidates.csv"
     report_path = tmp_path / "out" / "Van-Alloc-Rep.csv"
@@ -327,7 +328,11 @@ def test_write_results_does_not_mutate_input_dataframe(tmp_path, monkeypatch):
     )
     original_df = input_df.copy(deep=True)
 
-    write_results(input_df, class_map_df, quiet=True, date_on=False, working_directory=str(tmp_path))
+    write_results(
+        input_df,
+        class_map_df,
+        OutputOptions(quiet=True, date_on=False, working_directory=str(tmp_path)),
+    )
 
     assert input_df.equals(original_df)
 
@@ -343,7 +348,7 @@ def test_write_results_missing_cmdf_columns_raises_value_error():
     bad_cmdf = pd.DataFrame({"ClassMap": ["U.S. stocks"]})
 
     with pytest.raises(ValueError) as exc_info:
-        write_results(vadf, bad_cmdf, quiet=True, date_on=False)
+        write_results(vadf, bad_cmdf, OutputOptions(quiet=True, date_on=False))
     message = str(exc_info.value)
     assert "Class map output data is missing required columns" in message
     assert "['Order']" in message
