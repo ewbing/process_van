@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "process-van"
+version = "1.1"
+description = "Process Vanguard reports into consistent rows and add classifications"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Eric Bing", email = "ericbing+github@gmail.com" }
+]
+dependencies = [
+  "pandas"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pylint"
+]
+
+[project.scripts]
+process_van = "process_van:cli_entrypoint"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["process_van", "constants"]

@@ -51,16 +51,16 @@ Tracking list for remaining issues and refactors.
 
 ## Packaging and Dependencies
 
-- [ ] Move `pytest`/`pylint` to dev dependencies (keep runtime deps minimal).
-- [ ] Consider migrating packaging to `pyproject.toml`.
-- [ ] Add/verify console entry point for running `process_van` as a command.
-- [ ] Align install/run instructions with the final packaging approach.
+- [x] Move `pytest`/`pylint` to dev dependencies (keep runtime deps minimal).
+- [x] Consider migrating packaging to `pyproject.toml`.
+- [x] Add/verify console entry point for running `process_van` as a command.
+- [x] Align install/run instructions with the final packaging approach.
 
 ## Documentation
 
-- [ ] Add a "Quick Start" run example using downloaded `PortfolioWatchData.csv`.
-- [ ] Document expected output files and locations.
-- [ ] Add troubleshooting notes for common file/path/schema failures.
+- [x] Add a "Quick Start" run example using downloaded `PortfolioWatchData.csv`.
+- [x] Document expected output files and locations.
+- [x] Add troubleshooting notes for common file/path/schema failures.
 
 ## CI / Quality Gates (Optional)
 

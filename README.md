@@ -1,23 +1,84 @@
-﻿# process_van
+# process_van
 
 This program processes Vanguard allocation reports into consistent rows and adds classifications.
-Primary input is from the Vanguard portfolio watch detail page.  The CSV export
-is preferred because of its stability.
+Primary input is from the Vanguard Portfolio Watch detail page. The CSV export is preferred
+because of its stability.
 
 ## Installation
 
-`pip install -r requirements.txt`
+`process_van` works on Linux/macOS and Windows.
+
+```text
+# Runtime usage (installs the process_van command)
+python -m pip install -e .
+
+# Development tooling (tests + lint)
+python -m pip install -e ".[dev]"
+```
+
+Alternative (without package install):
+
+Linux/macOS:
+
+```bash
+PYTHONPATH=src python src/process_van.py --help
+```
+
+Windows PowerShell:
+
+```powershell
+$env:PYTHONPATH = "src"
+python .\src\process_van.py --help
+```
 
 ## CSV Download Instructions
 
 1. Log into Vanguard.
-2. Drill down to Portfolio Watch -> Asset Mix: <https://personal1.vanguard.com/pw1-portfolio-analysis/asset-mix>
+2. Go to Portfolio Watch -> Asset Mix: <https://personal1.vanguard.com/pw1-portfolio-analysis/asset-mix>
 3. Expand "Holdings by asset type".
-4. Click "Export Data" - this will likely download as `PortfolioWatchData.csv` in your Downloads folder.
+4. Click "Export Data" to download `PortfolioWatchData.csv` (typically into `~/Downloads`).
+
+## Quick Start
+
+Linux/macOS:
+
+```bash
+# 1) Prepare working directory layout
+mkdir -p ~/allocations/downloads ~/allocations/out
+
+# 2) Move the downloaded file into the expected default location
+cp ~/Downloads/PortfolioWatchData.csv ~/allocations/downloads/PortfolioWatchData.csv
+
+# 3) Run the command (installed via pip)
+process_van
+```
+
+Windows PowerShell:
+
+```powershell
+# 1) Prepare working directory layout
+New-Item -ItemType Directory -Force -Path "$HOME\allocations\downloads", "$HOME\allocations\out" | Out-Null
+
+# 2) Move the downloaded file into the expected default location
+Copy-Item "$HOME\Downloads\PortfolioWatchData.csv" "$HOME\allocations\downloads\PortfolioWatchData.csv"
+
+# 3) Run the command (installed via pip)
+process_van
+```
 
 ## Usage
 
-> `process_van.py [-h] [-q] [-f] [-wd WORKING_DIR] [--csv-path CSV_PATH] [-am ASSET_MAP] [-cm CLASS_MAP] [--no-date] [--date-format DATE_FORMAT]`
+```text
+process_van [-h] [-q] [-f] [-wd WORKING_DIR] [--csv-path CSV_PATH] [-am ASSET_MAP]
+            [-cm CLASS_MAP] [--no-date] [--date-format DATE_FORMAT]
+```
+
+## Default Working Directory
+
+If `--working-dir` is not provided, `process_van` defaults to `<user-home>/allocations`.
+
+- Linux/macOS example: `/home/alice/allocations`
+- Windows example: `C:\Users\Alice\allocations`
 
 ## Options
 
@@ -28,7 +89,7 @@ options:
   -f, --fixed           Group CDs and Treasuries in Fixed
   -wd WORKING_DIR, --working-dir WORKING_DIR
                         base working directory for defaults (default
-                        user-home/allocations)
+                        <user-home>/allocations)
   --csv-path CSV_PATH   input export csv file from Vanguard assets (default
                         <working-dir>/downloads/PortfolioWatchData.csv)
   -am ASSET_MAP, --asset_map ASSET_MAP
@@ -49,27 +110,53 @@ options:
 
 ```bash
 # default paths:
-#   input: <home>/allocations/downloads/PortfolioWatchData.csv
-#   class map: <home>/allocations/Class-Map.csv
-#   asset map: <home>/allocations/Asset-Map.csv
-#   outputs: <home>/allocations/out/*.csv
-.venv/bin/python src/process_van.py
+#   input: <working-dir>/downloads/PortfolioWatchData.csv
+#   class map: <working-dir>/Class-Map.csv
+#   asset map: <working-dir>/Asset-Map.csv
+#   outputs: <working-dir>/out/*.csv
+process_van
 
 # explicit input path (recommended)
-.venv/bin/python src/process_van.py --csv-path <home>/allocations/downloads/PortfolioWatchData.csv
+process_van --csv-path /full/path/PortfolioWatchData.csv
 
 # run from a custom working directory layout
-.venv/bin/python src/process_van.py --working-dir <home>/my-allocation-workdir
+process_van --working-dir <working-dir>
 
 # keep output filenames without date suffix
-.venv/bin/python src/process_van.py --csv-path <home>/allocations/downloads/PortfolioWatchData.csv --no-date
+process_van --csv-path <working-dir>/downloads/PortfolioWatchData.csv --no-date
 ```
 
 Legacy positional input is still accepted for compatibility:
 
 ```bash
-.venv/bin/python src/process_van.py <home>/allocations/downloads/PortfolioWatchData.csv
+process_van <working-dir>/downloads/PortfolioWatchData.csv
 ```
+
+## Output Files
+
+By default, outputs are written under `<working-dir>/out` (default working dir is user-home `allocations`, e.g. `~/allocations` on Linux/macOS).
+
+- `Van-Alloc-Rep-YYYY-MM-DD.csv`: report-style output, including subtotal/total rows.
+- `Van-Alloc-YYYY-MM-DD.csv`: sorted allocation output without subtotal/total rows.
+
+Candidate mapping output is written to the working dir root:
+
+- `Asset-Map-Candidates-YYYY-MM-DD.csv`: emitted when `Other*` classes are detected.
+
+If `--no-date` is used, filenames are written without the `-YYYY-MM-DD` suffix.
+
+## Troubleshooting
+
+- Missing input CSV:
+  Run with `--csv-path /full/path/PortfolioWatchData.csv`, or place the file at
+  `<working-dir>/downloads/PortfolioWatchData.csv`.
+- Missing/invalid map schemas:
+  Ensure class map columns are exactly `Class, ClassMap, Order` and asset map columns are
+  exactly `Name, Class, %`.
+- Relative path confusion:
+  Relative paths are resolved against `--working-dir`; pass absolute paths to avoid ambiguity.
+- CSV parse issues:
+  Re-export from Vanguard in CSV format and confirm the file is not empty/corrupted.
 
 ## CI Status
 
