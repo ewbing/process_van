@@ -64,6 +64,6 @@ Tracking list for remaining issues and refactors.
 
 ## CI / Quality Gates (Optional)
 
-- [ ] Add `python -m compileall src` to CI.
-- [ ] Pin lint/test tool versions for reproducibility.
-- [ ] Add coverage collection and threshold after expanding tests.
+- [x] Add `python -m compileall src` to CI.
+- [x] Pin lint/test tool versions for reproducibility.
+- [x] Add coverage collection and threshold after expanding tests.
