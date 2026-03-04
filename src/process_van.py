@@ -586,7 +586,7 @@ def write_sorted_allocations_csv(
     ].copy()
     # Sort by cl_dict using mergesort (to maintain the current order) - use
     # ClassMap ordering if non-nulls
-    if cmdf.Order.notnull().values.sum() > 0:
+    if cmdf["Order"].notna().any():
         alloc_df = alloc_df.sort_values(
             by=["Class"],
             kind="mergesort",
