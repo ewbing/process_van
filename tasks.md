@@ -9,10 +9,11 @@ Tracking list for remaining issues and refactors.
 - [x] Add tests for default path behavior and explicit path handling.
 
 ## Add explicit working directory
- - [x] Add parameter to allow working directory (default ~/allocations) - asset_maps at this level, subdirectories downloads and out
- - [x] Output full filepath in terminal
- - [x] Update defaults and launch.json for working directory
- - [x] Update readme for working directory
+
+- [x] Add parameter to allow working directory (default ~/allocations) - asset_maps at this level, subdirectories downloads and out
+- [x] Output full filepath in terminal
+- [x] Update defaults and launch.json for working directory
+- [x] Update readme for working directory
 
 ## CSV Schema Validation
 
@@ -25,7 +26,6 @@ Tracking list for remaining issues and refactors.
 - [x] Ensure malformed input errors are deterministic and readable (no raw pandas `KeyError` leaks).
 - [x] Standardize helper behavior: raise exceptions in helpers, exit only in CLI entry path.
 - [x] Add tests covering malformed portfolio/class-map/asset-map files.
-
 
 ## Pipeline Refactor
 
@@ -40,6 +40,7 @@ Tracking list for remaining issues and refactors.
 - [x] Add regression test to verify pre-output DataFrame is unchanged.
 
 ## Test Coverage Expansion
+
 - [x] Add tests for `read_csv_portfolio`.
 - [x] Add tests for `csv_post_process`.
 - [x] Add tests for `post_process`.
@@ -67,3 +68,7 @@ Tracking list for remaining issues and refactors.
 - [x] Add `python -m compileall src` to CI.
 - [x] Pin lint/test tool versions for reproducibility.
 - [x] Add coverage collection and threshold after expanding tests.
+
+## Asset Map Candidates
+
+- [ ] Allow assets to apply proportionally to more than one category
