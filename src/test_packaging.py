@@ -1,8 +1,11 @@
+"""Packaging configuration tests."""
+
 from pathlib import Path
 import tomllib
 
 
 def test_console_script_entrypoint_configured():
+    """Verify the console script entrypoint is declared in pyproject."""
     project_root = Path(__file__).resolve().parent.parent
     pyproject_path = project_root / "pyproject.toml"
 
