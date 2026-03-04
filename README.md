@@ -158,6 +158,20 @@ If `--no-date` is used, filenames are written without the `-YYYY-MM-DD` suffix.
 - CSV parse issues:
   Re-export from Vanguard in CSV format and confirm the file is not empty/corrupted.
 
+## Test Coverage
+
+Install dev dependencies, then run:
+
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest --cov=process_van --cov=constants --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+```
+
+This prints line-by-line missing coverage in the terminal and writes `coverage.xml` for CI tooling.
+
+GitHub Actions already runs this in `.github/workflows/pytest.yml` and uploads `coverage.xml` as an artifact on each run.
+In the Actions UI, open a workflow run and download the `coverage-xml` artifact.
+
 ## CI Status
 
 [![Pylint](https://github.com/ewbing/process_van/actions/workflows/pylint.yml/badge.svg)](https://github.com/ewbing/process_van/actions/workflows/pylint.yml) [![Pytest](https://github.com/ewbing/process_van/actions/workflows/pytest.yml/badge.svg)](https://github.com/ewbing/process_van/actions/workflows/pytest.yml)
